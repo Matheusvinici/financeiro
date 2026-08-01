@@ -1,0 +1,89 @@
+# loop
+clear
+
+read -p "Digite o nome da tabela: " table
+
+dirZips="/tmp"
+dirSqls="/tmp"
+database="backup"
+database_tmp="backup_tmp"
+table="adm_$table"
+
+mkdir -p $dirSqls/$table &&
+cd $dirZips &&
+
+echo "Descompactando Sqls ..."
+unzip \*.zip -d $dirSqls &&
+
+echo "Extraindo tabela $table ..." &&
+cd $dirSqls &&
+
+for f in *.sql
+do
+        sed -n -e "/DROP TABLE.*\`$table\`/,/UNLOCK TABLES/p" $f > $table/$f &&
+        rm $dirSqls/$f
+done
+
+#  Excuta o seguintes comandos após a iteração anterior
+if [ $? -eq 0 ]; then
+
+        echo "Criando tabela $table" &&
+
+        /opt/lampp/bin/mysql $database -u root -proot -e "
+        USE $database;
+        DROP TABLE IF EXISTS $table;
+        CREATE TABLE IF NOT EXISTS $table SELECT * FROM ep.$table;
+        TRUNCATE TABLE $table;
+        " &&
+
+        echo "Entrando no diretório $dirSqls/$table/" &&
+
+        cd  $dirSqls/$table/ &&
+
+        /opt/lampp/bin/mysql ep -u root -proot -e "
+        select distinct concat('USE $database;', ' alter table ',
+                            table_name,
+                            ' modify ',
+                            column_name,
+                            ' TEXT; '
+                            # if(is_nullable = 'NO', ' NOT ', ''),
+                            # ' NULL;'
+                            ) as delete_this
+        from information_schema.columns
+        where table_schema = '$database'
+        and table_name = '$table';
+        " > change_type.sql &&
+
+        sed -i 's/delete_this//' change_type.sql &&
+
+        /opt/lampp/bin/mysql -u root -p'root' $database < change_type.sql &&
+
+        echo "Restaurando tabelas ..." &&
+        # COLUMN_QUERY="USE $database_tmp; SHOW COLUMNS FROM $table";
+
+        for f in *.sql
+        do
+                # echo $database_tmp
+                sed -i '/CONSTRAINT `/d' $dirSqls/$table/$f &&
+                awk -i inplace 'BEGIN{RS="";ORS="\n"} {gsub("\\),\n) ENGINE=", ")\n) ENGINE=")} 1' $dirSqls/$table/$f &&
+
+                # Restaura sqls
+                /opt/lampp/bin/mysql -u root -p'root' $database_tmp < $dirSqls/$table/$f &&
+
+                /opt/lampp/bin/mysql ep -u root -proot -e "
+                USE $database;
+                INSERT INTO $table
+                SELECT DISTINCT
+                    *
+                FROM $database_tmp.$table;
+                USE $database_tmp;
+                DROP TABLE IF EXISTS $table
+                "
+        done
+fi
+
+
+
+
+
+

@@ -1,0 +1,34 @@
+/.phpunit.cache
+/node_modules
+# /public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+
+# WhatsApp Bot
+/whatsapp-bot/node_modules
+/whatsapp-bot/.wwebjs_auth
+/whatsapp-bot/qr.png
+/.wwebjs_auth
+/.wwebjs_cache
+/whatsapp-bot/bot.log
+/whatsapp-bot/.wwebjs_cache
+whatsapp-bot/auth_baileys/
+whatsapp-bot/node_modules/
