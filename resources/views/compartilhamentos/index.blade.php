@@ -42,8 +42,8 @@
     <div class="row g-3">
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-primary-subtle">
-                    <h5 class="mb-0"><i class="fa-solid fa-share-from-square me-2"></i>Compartilhamentos que eu fiz</h5>
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fa-solid fa-share-from-square me-2 text-primary"></i>Compartilhamentos que eu fiz</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -84,8 +84,8 @@
         </div>
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-info-subtle">
-                    <h5 class="mb-0"><i class="fa-solid fa-eye me-2"></i>Finanças compartilhadas comigo</h5>
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fa-solid fa-eye me-2 text-primary"></i>Finanças compartilhadas comigo</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">

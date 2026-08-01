@@ -112,9 +112,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-5">
-                                    <i class="fa-solid fa-folder-open fa-2x mb-2 d-block"></i>
-                                    Nenhum lançamento encontrado.
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <i class="fa-solid fa-folder-open"></i>
+                                        <p>Nenhum lançamento encontrado.</p>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse

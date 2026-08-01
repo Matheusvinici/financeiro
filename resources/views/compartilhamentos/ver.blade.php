@@ -31,30 +31,22 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="small-box bg-success">
-                <div class="inner">
-                    <h3>R$ {{ number_format($receitas, 2, ',', '.') }}</h3>
-                    <p>Receitas no período</p>
-                </div>
-                <div class="icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
-            </div>
+    <div class="stats-grid">
+        <div class="stat-card green">
+            <div class="stat-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div class="stat-value">R$ {{ number_format($receitas, 2, ',', '.') }}</div>
+            <div class="stat-label">Receitas no período</div>
         </div>
-        <div class="col-md-6">
-            <div class="small-box bg-danger">
-                <div class="inner">
-                    <h3>R$ {{ number_format($despesas, 2, ',', '.') }}</h3>
-                    <p>Despesas no período</p>
-                </div>
-                <div class="icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
-            </div>
+        <div class="stat-card red">
+            <div class="stat-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
+            <div class="stat-value">R$ {{ number_format($despesas, 2, ',', '.') }}</div>
+            <div class="stat-label">Despesas no período</div>
         </div>
     </div>
 
     <div class="card shadow-sm">
         <div class="card-header">
-            <h5 class="mb-0"><i class="fa-solid fa-wallet me-2"></i>Lançamentos visíveis</h5>
+            <h5 class="card-title"><i class="fa-solid fa-wallet me-2 text-primary"></i>Lançamentos visíveis</h5>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">

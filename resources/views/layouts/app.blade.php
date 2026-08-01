@@ -1,130 +1,178 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') — Meu Financeiro</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     @vite(['resources/js/app.js', 'resources/css/app.css'])
     @stack('styles')
+
+    <script>
+        (function () {
+            const tema = localStorage.getItem('mf-theme') || 'light';
+            document.body.setAttribute('data-bs-theme', tema);
+        })();
+    </script>
 </head>
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
-<div class="app-wrapper">
-
-    <nav class="app-header navbar navbar-expand bg-body">
-        <div class="container-fluid">
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button"><i class="fa-solid fa-bars"></i></a>
-                </li>
-                <li class="nav-item d-none d-md-block">
-                    <a href="{{ route('dashboard') }}" class="nav-link">{{ \Carbon\Carbon::now()->translatedFormat('l, d \d\e F \d\e Y') }}</a>
-                </li>
-            </ul>
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item dropdown user-menu">
-                    <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="d-none d-md-inline">{{ auth()->user()->name }}</span>
-                        <i class="fa-solid fa-user ms-2"></i>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow">
-                        <li><a class="dropdown-item" href="{{ route('configuracoes.index') }}"><i class="fa-solid fa-gear me-2"></i>Configurações</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="dropdown-item"><i class="fa-solid fa-right-from-bracket me-2"></i>Sair</button>
-                            </form>
-                        </li>
-                    </ul>
-                </li>
-            </ul>
+<body data-bs-theme="light">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="{{ route('dashboard') }}" class="logo-container text-decoration-none">
+                <div class="logo-icon"><i class="fa-solid fa-coins"></i></div>
+                <span class="logo-text">Meu Financeiro<small>Controle pessoal</small></span>
+            </a>
         </div>
-    </nav>
 
-    <aside class="app-sidebar bg-body-secondary shadow">
-        <a href="{{ route('dashboard') }}" class="brand-link">
-            <span class="brand-text fw-bold"><i class="fa-solid fa-coins me-2 text-warning"></i>Meu Financeiro</span>
-        </a>
-        <div class="sidebar-wrapper">
-            <nav class="mt-2">
-                <ul class="nav sidebar-menu flex-column">
-                    <li class="nav-item">
-                        <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-house"></i><p>Dashboard</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('lancamentos.index') }}" class="nav-link {{ request()->routeIs('lancamentos.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-wallet"></i><p>Lançamentos</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('relatorios.mensal') }}" class="nav-link {{ request()->routeIs('relatorios.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-chart-simple"></i><p>Relatório Mensal</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('categorias.index') }}" class="nav-link {{ request()->routeIs('categorias.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-tags"></i><p>Categorias</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('cartoes.index') }}" class="nav-link {{ request()->routeIs('cartoes.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-credit-card"></i><p>Cartões</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('contas-pagar.index') }}" class="nav-link {{ request()->routeIs('contas-pagar.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-hand-holding-dollar"></i><p>Contas a Pagar</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('compartilhamentos.index') }}" class="nav-link {{ request()->routeIs('compartilhamentos.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-share-nodes"></i><p>Compartilhar</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('configuracoes.index') }}" class="nav-link {{ request()->routeIs('configuracoes.*') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-gear"></i><p>Configurações</p>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                    <i class="fa-solid fa-house"></i><span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('lancamentos.index') }}" class="nav-link {{ request()->routeIs('lancamentos.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-wallet"></i><span>Lançamentos</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('relatorios.mensal') }}" class="nav-link {{ request()->routeIs('relatorios.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-chart-simple"></i><span>Relatório Mensal</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('categorias.index') }}" class="nav-link {{ request()->routeIs('categorias.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-tags"></i><span>Categorias</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('cartoes.index') }}" class="nav-link {{ request()->routeIs('cartoes.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-credit-card"></i><span>Cartões</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('contas-pagar.index') }}" class="nav-link {{ request()->routeIs('contas-pagar.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-hand-holding-dollar"></i><span>Contas a Pagar</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('compartilhamentos.index') }}" class="nav-link {{ request()->routeIs('compartilhamentos.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-share-nodes"></i><span>Compartilhar</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('configuracoes.index') }}" class="nav-link {{ request()->routeIs('configuracoes.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-gear"></i><span>Configurações</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</div>
+                <div>
+                    <strong>{{ auth()->user()->name }}</strong>
+                    <small>{{ auth()->user()->email }}</small>
+                </div>
+            </div>
         </div>
     </aside>
 
-    <main class="app-main">
-        <div class="container-fluid">
-            <div class="app-content-header">
-                <h3 class="mb-0">@yield('page-title', '')</h3>
+    <div class="main-content">
+        <header class="top-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <button class="menu-toggle" id="menuToggle" title="Menu">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div class="header-greeting">
+                        <h1>@yield('page-title', 'Dashboard')</h1>
+                        <p>Olá, {{ auth()->user()->name }} — {{ \Carbon\Carbon::now()->translatedFormat('l, d \d\e F \d\e Y') }}</p>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <button class="theme-toggle" id="themeToggle" title="Alternar tema">
+                        <i class="fa-solid fa-moon" id="themeIcon"></i>
+                    </button>
+                    <a href="{{ route('configuracoes.index') }}" class="btn-profile d-none d-sm-flex">
+                        <i class="fa-solid fa-user"></i>
+                        <span>Configurações</span>
+                    </a>
+                    <form method="POST" action="{{ route('logout') }}" class="m-0">
+                        @csrf
+                        <button type="submit" class="btn-logout">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span class="d-none d-sm-inline">Sair</span>
+                        </button>
+                    </form>
+                </div>
             </div>
+        </header>
+
+        <div class="content-area">
             @if (session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <div class="alert alert-success alert-dismissible fade show d-flex justify-content-between align-items-center" role="alert">
                     {{ session('success') }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif
             @if ($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <strong>Ops!</strong> Verifique os erros abaixo.
+                <div class="alert alert-danger alert-dismissible fade show d-flex justify-content-between align-items-center" role="alert">
+                    <div><strong>Ops!</strong> Verifique os erros abaixo.</div>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif
-            <div class="app-content mt-2">
-                @yield('content')
-            </div>
+
+            @yield('content')
         </div>
-    </main>
 
-    <footer class="app-footer">
-        <div class="float-end d-none d-sm-inline">Meu Financeiro</div>
-        <strong>Copyright &copy; 2026.</strong> Todos os direitos reservados.
-    </footer>
+        <footer class="footer">
+            © {{ date('Y') }} Meu Financeiro. Todos os direitos reservados.
+        </footer>
+    </div>
 
-</div>
+    <script src="{{ asset('js/chart.umd.min.js') }}"></script>
+    @stack('scripts')
 
-<script src="{{ asset('js/chart.umd.min.js') }}"></script>
-@stack('scripts')
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+
+        function aplicarIconeTema(tema) {
+            themeIcon.classList.toggle('fa-moon', tema === 'light');
+            themeIcon.classList.toggle('fa-sun', tema === 'dark');
+        }
+
+        aplicarIconeTema(document.body.getAttribute('data-bs-theme'));
+
+        themeToggle.addEventListener('click', () => {
+            const atual = document.body.getAttribute('data-bs-theme');
+            const novo = atual === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-bs-theme', novo);
+            localStorage.setItem('mf-theme', novo);
+            aplicarIconeTema(novo);
+        });
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 991.98) {
+                if (!sidebar.contains(e.target) && !menuToggle.contains(e.target) && sidebar.classList.contains('show')) {
+                    sidebar.classList.remove('show');
+                }
+            }
+        });
+    </script>
 </body>
 </html>

@@ -101,8 +101,12 @@ class RelatorioController extends Controller
                 (float) ($agrupadas['despesas'][$nome][$item][$l->data->month] ?? 0) + $l->valor;
         }
 
-        ksort($agrupadas['receitas'] ?? []);
-        ksort($agrupadas['despesas'] ?? []);
+        if (isset($agrupadas['receitas'])) {
+            ksort($agrupadas['receitas']);
+        }
+        if (isset($agrupadas['despesas'])) {
+            ksort($agrupadas['despesas']);
+        }
 
         return $agrupadas;
     }

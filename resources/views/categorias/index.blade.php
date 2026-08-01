@@ -40,8 +40,8 @@
     <div class="row g-3">
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-success-subtle">
-                    <h5 class="mb-0"><i class="fa-solid fa-arrow-trend-up text-success me-2"></i>Receitas</h5>
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fa-solid fa-arrow-trend-up text-success me-2"></i>Receitas</h5>
                 </div>
                 <div class="card-body p-0">
                     <x-categorias-lista :categorias="$receitas" tipo="receita" />
@@ -50,8 +50,8 @@
         </div>
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-danger-subtle">
-                    <h5 class="mb-0"><i class="fa-solid fa-arrow-trend-down text-danger me-2"></i>Despesas</h5>
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fa-solid fa-arrow-trend-down text-danger me-2"></i>Despesas</h5>
                 </div>
                 <div class="card-body p-0">
                     <x-categorias-lista :categorias="$despesas" tipo="despesa" />
