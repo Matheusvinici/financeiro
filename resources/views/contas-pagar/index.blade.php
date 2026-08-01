@@ -93,13 +93,13 @@
                                     @if ($conta->status !== 'pago')
                                         <form method="POST" action="{{ route('contas-pagar.pagar', $conta) }}" class="d-inline">
                                             @csrf
-                                            <button class="btn btn-sm btn-success" title="Registrar pagamento" onclick="event.preventDefault(); const v = prompt('Valor a pagar (R$):', '{{ number_format($conta->valor_restante, 2, '.', '') }}'); if(v){ const i = document.createElement('input'); i.type='hidden'; i.name='valor'; i.value=v.replace(',','.'); this.appendChild(i); this.submit(); }"><i class="fa-solid fa-money-bill-wave"></i></button>
+                                            <button class="btn btn-sm btn-success" title="Registrar pagamento" onclick="event.preventDefault(); const v = prompt('Valor a pagar (R$):', '{{ number_format($conta->valor_restante, 2, '.', '') }}'); if(v){ const i = document.createElement('input'); i.type='hidden'; i.name='valor'; i.value=v.replace(',','.'); this.appendChild(i); this.submit(); }"><i class="fa-solid fa-money-bill-wave me-1"></i>Pagar</button>
                                         </form>
                                     @endif
-                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#edit{{ $conta->id }}"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#edit{{ $conta->id }}"><i class="fa-solid fa-pen me-1"></i>Editar</button>
                                     <form method="POST" action="{{ route('contas-pagar.destroy', $conta) }}" class="d-inline" onsubmit="return confirm('Excluir conta?')">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
                                     </form>
                                 </td>
                             </tr>

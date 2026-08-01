@@ -58,10 +58,10 @@
                                 @if ($t['cartao']->bandeira)<span class="badge bg-light text-dark border ms-1">{{ $t['cartao']->bandeira }}</span>@endif
                             </div>
                             <div class="btn-group">
-                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#edit{{ $t['cartao']->id }}"><i class="fa-solid fa-pen"></i></button>
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#edit{{ $t['cartao']->id }}"><i class="fa-solid fa-pen me-1"></i>Editar</button>
                                 <form method="POST" action="{{ route('cartoes.destroy', $t['cartao']) }}" onsubmit="return confirm('Excluir cartão?')">
                                     @csrf @method('DELETE')
-                                    <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
                                 </form>
                             </div>
                         </div>

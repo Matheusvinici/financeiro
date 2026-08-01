@@ -22,16 +22,16 @@
                             @endforeach
                         </div>
                     </td>
-                    <td class="align-middle text-end" style="width: 150px;">
+                    <td class="align-middle text-end" style="width: 230px;">
                         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#addSub{{ $categoria->id }}" title="Adicionar item">
-                            <i class="fa-solid fa-plus"></i> item
+                            <i class="fa-solid fa-plus me-1"></i>Item
                         </button>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editCat{{ $categoria->id }}" title="Editar">
-                            <i class="fa-solid fa-pen"></i>
+                            <i class="fa-solid fa-pen me-1"></i>Editar
                         </button>
                         <form method="POST" action="{{ route('categorias.destroy', $categoria) }}" class="d-inline" onsubmit="return confirm('Excluir categoria e seus itens?')">
                             @csrf @method('DELETE')
-                            <button class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
                         </form>
                     </td>
                 </tr>

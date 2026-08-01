@@ -69,7 +69,7 @@
                                         <td class="text-end">
                                             <form method="POST" action="{{ route('compartilhamentos.destroy', $e) }}" onsubmit="return confirm('Remover compartilhamento?')">
                                                 @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                                <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Remover</button>
                                             </form>
                                         </td>
                                     </tr>

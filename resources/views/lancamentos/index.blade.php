@@ -54,7 +54,7 @@
                     <input type="text" name="busca" class="form-control" value="{{ request('busca') }}" placeholder="Buscar...">
                 </div>
                 <div class="col-md-1 d-flex gap-1">
-                    <button class="btn btn-primary flex-grow-1" title="Filtrar"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    <button class="btn btn-primary flex-grow-1" title="Filtrar"><i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar</button>
                     <a href="{{ route('lancamentos.index') }}" class="btn btn-outline-secondary" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
                 </div>
             </form>
@@ -103,10 +103,10 @@
                                     {{ $l->tipo === 'receita' ? '+' : '-' }}R$ {{ number_format($l->valor, 2, ',', '.') }}
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a>
+                                    <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Editar</a>
                                     <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento{{ $l->isParcela() ? ' e toda a série de parcelas' : '' }}?')">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
                                     </form>
                                 </td>
                             </tr>
