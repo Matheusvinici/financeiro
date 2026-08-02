@@ -20,7 +20,8 @@ class ImportarPlanilha extends Command
         {--anos=* : Anos a importar, ex. --anos=2025 --anos=2026 (padrão: todos)}
         {--arquivo=database/contas.xlsx : Caminho da planilha}
         {--base : Importa apenas categorias e cartões, sem lançamentos nem contas a pagar}
-        {--limpar : Apaga os dados financeiros do usuário antes de importar}';
+        {--limpar : Apaga os dados financeiros do usuário antes de importar}
+        {--sem-dividas : Não cria contas a pagar (dívidas) }';
 
     protected $description = 'Importa o arquivo contas.xlsx (2021-2027) para o sistema financeiro (--base = só categorias e cartões)';
 
@@ -142,6 +143,8 @@ class ImportarPlanilha extends Command
             $this->garantirCartoesBase($user);
             $this->sincronizarPermissoesCategorias($user);
             $this->info('Modo base: contas a pagar ignoradas.');
+        } elseif ($this->option('sem-dividas')) {
+            $this->info('Contas a pagar ignoradas (--sem-dividas).');
         } else {
             $importadas = $this->importarDividas($user);
             $this->info("Contas a pagar criadas: {$importadas}");
@@ -348,6 +351,10 @@ class ImportarPlanilha extends Command
         $cartao = $this->cartaoParaItem($user, $item, $categoria->nome);
         $forma = $cartao ? 'cartao' : 'pix';
 
+        $naoAbateSaldo = $categoria->nome === 'TERRENOS'
+            || ($categoria->nome === 'VALLE PETROLINA' && $this->norm($item) === 'condominio');
+        $mesCorrente = now()->format('Y-m');
+
         $contador = 0;
         foreach ($valores as $mes => $valor) {
             if (!$valor || $valor <= 0) {
@@ -364,6 +371,8 @@ class ImportarPlanilha extends Command
                 'subcategoria_id' => $sub?->id,
                 'forma_pagamento' => $forma,
                 'cartao_id' => $cartao?->id,
+                'pago' => $categoria->tipo === 'receita' || sprintf('%04d-%02d', $ano, $mes) < $mesCorrente,
+                'abate_saldo' => !$naoAbateSaldo,
                 'recorrente' => $recorrente,
                 'qtd_parcelas' => 1,
                 'parcela_atual' => 1,
