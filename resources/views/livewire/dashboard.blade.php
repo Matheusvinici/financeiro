@@ -1,8 +1,8 @@
 <div>
     @php
-        $rotuloPeriodo = $mes === 'todos'
+        $rotuloPeriodo = $mes === 'todos' || $mes === 'Todos'
             ? 'ano ' . $ano
-            : \Carbon\Carbon::now()->month($mes)->translatedFormat('F/Y');
+            : \Carbon\Carbon::now()->month((int) $mes)->translatedFormat('F/Y');
     @endphp
 
     {{-- Seletor de período (atualiza sozinho) --}}
@@ -31,7 +31,7 @@
                     <select class="form-select" onchange="if(this.value){ window.location.href = this.value; }">
                         <option value="">— Ir direto para —</option>
                         @foreach ($mesesDisponiveis as $p)
-                            <option value="{{ route('dashboard', ['mes' => $p['mes'], 'ano' => $p['ano']]) }}" @selected($mes === $p['mes'] && $ano === $p['ano'])>
+                            <option value="{{ route('dashboard', ['mes' => $p['mes'], 'ano' => $p['ano']]) }}" @selected((int) $mes === $p['mes'] && (int) $ano === $p['ano'])>
                                 {{ \Carbon\Carbon::now()->month($p['mes'])->translatedFormat('F') . '/' . $p['ano'] }}
                             </option>
                         @endforeach

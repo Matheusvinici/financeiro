@@ -42,6 +42,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a href="{{ route('pendencias.index') }}" class="nav-link {{ request()->routeIs('pendencias.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-bell"></i><span>Pendências do mês</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="{{ route('relatorios.mensal') }}" class="nav-link {{ request()->routeIs('relatorios.*') ? 'active' : '' }}">
                     <i class="fa-solid fa-chart-simple"></i><span>Relatório Mensal</span>
                 </a>

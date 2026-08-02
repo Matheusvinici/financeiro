@@ -12,7 +12,7 @@ class Lancamento extends Model
         'user_id', 'data', 'descricao', 'valor', 'tipo',
         'categoria_id', 'subcategoria_id', 'forma_pagamento',
         'cartao_id', 'recorrente', 'qtd_parcelas', 'parcela_atual',
-        'origem_id', 'observacao',
+        'origem_id', 'observacao', 'pago', 'abate_saldo', 'cartao_debito',
     ];
 
     protected $casts = [
@@ -21,6 +21,9 @@ class Lancamento extends Model
         'recorrente' => 'boolean',
         'qtd_parcelas' => 'integer',
         'parcela_atual' => 'integer',
+        'pago' => 'boolean',
+        'abate_saldo' => 'boolean',
+        'cartao_debito' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -51,6 +54,16 @@ class Lancamento extends Model
     public function isParcela(): bool
     {
         return $this->qtd_parcelas > 1;
+    }
+
+    public function isPendente(): bool
+    {
+        return $this->tipo === 'despesa' && !$this->pago;
+    }
+
+    public function isVencido(): bool
+    {
+        return $this->isPendente() && $this->data?->isPast();
     }
 
     public function getFormaLabelAttribute(): string

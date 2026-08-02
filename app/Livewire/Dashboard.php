@@ -57,7 +57,7 @@ class Dashboard extends Component
         $receitasMes = (float) $user->lancamentos()->where('tipo', 'receita')
             ->quando($periodo, $ano, $mesAtual)->sum('valor');
         $despesasMes = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->quando($periodo, $ano, $mesAtual)->sum('valor');
+            ->where('abate_saldo', true)->quando($periodo, $ano, $mesAtual)->sum('valor');
         $saldoMes = $receitasMes - $despesasMes;
 
         if ($mes === 'todos') {
@@ -71,11 +71,11 @@ class Dashboard extends Component
         $receitasMesAnterior = (float) $user->lancamentos()->where('tipo', 'receita')
             ->quando($periodoAnt, $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
         $despesasMesAnterior = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->quando($periodoAnt, $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
+            ->where('abate_saldo', true)->quando($periodoAnt, $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
         $saldoMesAnterior = $receitasMesAnterior - $despesasMesAnterior;
 
         $saldoAno = (float) $user->lancamentos()->whereYear('data', $ano)
-            ->get()->sum(fn ($l) => $l->tipo === 'receita' ? $l->valor : -$l->valor);
+            ->get()->sum(fn ($l) => $l->tipo === 'receita' ? $l->valor : ($l->abate_saldo ? -$l->valor : 0));
 
         $contasAberto = ContaPagar::where('user_id', $user->id)
             ->where('status', '!=', 'pago')->get();
@@ -217,10 +217,10 @@ class Dashboard extends Component
         $periodo = $mes === null ? 'ano' : 'mes';
 
         $parcelas = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->where('qtd_parcelas', '>', 1)->quando($periodo, $ano, $mes)->sum('valor');
+            ->where('abate_saldo', true)->where('qtd_parcelas', '>', 1)->quando($periodo, $ano, $mes)->sum('valor');
 
         $fixas = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->where('recorrente', true)->quando($periodo, $ano, $mes)->sum('valor');
+            ->where('abate_saldo', true)->where('recorrente', true)->quando($periodo, $ano, $mes)->sum('valor');
 
         $total = $parcelas + $fixas;
 
@@ -241,7 +241,7 @@ class Dashboard extends Component
         $periodo = $mes === null ? 'ano' : 'mes';
 
         $parcelasMes = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->where('qtd_parcelas', '>', 1)->quando($periodo, $ano, $mes)->sum('valor');
+            ->where('abate_saldo', true)->where('qtd_parcelas', '>', 1)->quando($periodo, $ano, $mes)->sum('valor');
 
         $margem = $receitaMedia - $despesaMedia;
         $margemLivre = $margem - $parcelasMes;

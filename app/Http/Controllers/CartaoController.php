@@ -49,7 +49,6 @@ class CartaoController extends Controller
 
         $parcelasFuturas = $user->lancamentos()
             ->where('tipo', 'despesa')
-            ->where('qtd_parcelas', '>', 1)
             ->whereNotNull('cartao_id')
             ->whereBetween('data', [$inicio, $fim])
             ->selectRaw('cartao_id, YEAR(data) as y, MONTH(data) as m, SUM(valor) as total')

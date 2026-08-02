@@ -37,9 +37,9 @@
             </div>
             <div class="col-md-2">
                 <label class="form-label">Valor (R$) *</label>
-                <input type="text" x-data x-init="$el.value = $wire.valor || ''"
+                <input type="text" x-data x-init="$el.value || ($el.value = $wire.valor || '')"
                        x-on:input="const digits = $el.value.replace(/\D/g, '').slice(0, 12); const num = parseInt(digits || '0', 10); $el.value = (num / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });"
-                       wire:model="valor" inputmode="decimal" class="form-control" placeholder="R$ 0,00" required>
+                       wire:model.blur="valor" inputmode="decimal" class="form-control" placeholder="R$ 0,00" required>
                 @error('valor')<div class="text-danger small">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-2">
@@ -47,19 +47,46 @@
                 <input type="date" wire:model="data" class="form-control" required>
                 @error('data')<div class="text-danger small">{{ $message }}</div>@enderror
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Categoria</label>
-                <select wire:model.live="categoria_id" id="categoria_id" class="form-select">
-                    <option value="">— Selecionar categoria —</option>
-                    @foreach ($this->categorias->where('tipo', $tipo) as $c)
-                        <option value="{{ $c->id }}">{{ $c->nome }}</option>
-                    @endforeach
-                </select>
-                @error('categoria_id')<div class="text-danger small">{{ $message }}</div>@enderror
+            <div class="col-md-4 {{ $tipo === 'despesa' && $forma_pagamento === 'cartao' ? '' : '' }}" id="categoria_div">
+                @if ($tipo === 'despesa' && $forma_pagamento === 'cartao')
+                    <label class="form-label">Categoria</label>
+                    <div class="alert alert-dark py-2 mb-0">
+                        <i class="fa-solid fa-credit-card me-1"></i><strong>Gasto com cartão</strong>
+                        <small class="d-block mt-1">Controlado na área de Cartões — não usa categoria</small>
+                    </div>
+                @else
+                    <label class="form-label">Categoria</label>
+                    <select wire:model.live="categoria_id" id="categoria_id" class="form-select">
+                        <option value="">— Selecionar categoria —</option>
+                        @foreach ($this->categorias->where('tipo', $tipo) as $c)
+                            <option value="{{ $c->id }}">{{ $c->nome }}</option>
+                        @endforeach
+                    </select>
+                    @error('categoria_id')<div class="text-danger small">{{ $message }}</div>@enderror
+                @endif
             </div>
 
             @if ($tipo === 'despesa')
-                @if ($this->itens->isNotEmpty())
+                <div class="col-12">
+                    <label class="form-label fw-bold">Como vai pagar?</label>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <input type="radio" class="btn-check" name="forma_rapida" id="forma-cartao" value="cartao" wire:model.live="forma_pagamento">
+                            <label class="btn btn-outline-dark btn-lg w-100 text-start" for="forma-cartao">
+                                <i class="fa-solid fa-credit-card me-2"></i><strong>Gasto com cartão</strong>
+                                <small class="d-block opacity-75">Escolher um dos cartões cadastrados</small>
+                            </label>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-outline-secondary btn-lg w-100 text-start" wire:click="$set('forma_pagamento', '')">
+                                <i class="fa-solid fa-wallet me-2"></i><strong>Outra forma</strong>
+                                <small class="d-block opacity-75">Pix, dinheiro, boleto...</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                @if ($this->itens->isNotEmpty() && $forma_pagamento !== 'cartao')
                 <div class="col-md-4" wire:key="campo-item">
                     <label class="form-label">Item</label>
                     <select wire:model="subcategoria_id" class="form-select">
@@ -72,7 +99,23 @@
                 </div>
                 @endif
 
-                <div class="col-md-4 {{ $this->itens->isNotEmpty() ? '' : 'col-md-6' }}">
+                <div class="col-md-4 {{ $forma_pagamento === 'cartao' ? 'd-none' : '' }}" id="pago_div">
+                    <label class="form-label">Já pago?</label>
+                    <div class="form-check form-switch mt-2">
+                        <input type="checkbox" class="form-check-input" id="campo_pago" wire:model="pago">
+                        <label class="form-check-label" for="campo_pago">Este gasto já foi pago</label>
+                    </div>
+                    <small class="text-muted d-block">Desmarcar para aparecer nas pendências do mês</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Abate do saldo?</label>
+                    <div class="form-check form-switch mt-2">
+                        <input type="checkbox" class="form-check-input" id="campo_abate" wire:model="abate_saldo">
+                        <label class="form-check-label" for="campo_abate">Sai do meu dinheiro</label>
+                    </div>
+                    <small class="text-muted d-block">Desmarcar se paga por terceiros (não abate, mas acompanha)</small>
+                </div>
+                <div class="col-md-4 {{ $forma_pagamento === 'cartao' ? 'd-none' : '' }}" id="forma_div">
                     <label class="form-label">Forma de pagamento</label>
                     <select wire:model.live="forma_pagamento" class="form-select">
                         <option value="">— Selecionar —</option>
@@ -141,7 +184,7 @@
         </div>
 
         <div class="mt-4 d-flex gap-2">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" id="btn-salvar" class="btn btn-primary">
                 <span wire:loading.remove wire:target="save"><i class="fa-solid fa-floppy-disk me-1"></i>Salvar</span>
                 <span wire:loading wire:target="save"><span class="spinner-border spinner-border-sm me-1"></span>Salvando...</span>
             </button>

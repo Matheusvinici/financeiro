@@ -36,12 +36,28 @@ class LancamentoForm extends Component
 
     public string $observacao = '';
 
+    public bool $pago = true;
+
+    public bool $abate_saldo = true;
+
+    public bool $cartao_debito = false;
+
     public function mount(?Lancamento $lancamento = null): void
     {
         $this->lancamentoId = $lancamento?->id;
         $this->data = $lancamento?->data?->format('Y-m-d') ?? now()->format('Y-m-d');
 
         if (!$lancamento) {
+            if (request()->query('forma') === 'cartao') {
+                $this->tipo = 'despesa';
+                $this->forma_pagamento = 'cartao';
+
+                $cartaoId = (int) request()->query('cartao', 0);
+                if ($cartaoId && auth()->user()->cartoes()->where('id', $cartaoId)->exists()) {
+                    $this->cartao_id = $cartaoId;
+                }
+            }
+
             return;
         }
 
@@ -52,7 +68,10 @@ class LancamentoForm extends Component
         $this->subcategoria_id = $lancamento->subcategoria_id;
         $this->forma_pagamento = $lancamento->forma_pagamento;
         $this->cartao_id = $lancamento->cartao_id;
+        $this->cartao_debito = (bool) $lancamento->cartao_debito;
         $this->observacao = $lancamento->observacao ?? '';
+        $this->pago = (bool) $lancamento->pago;
+        $this->abate_saldo = (bool) $lancamento->abate_saldo;
 
         if ($lancamento->recorrente) {
             $this->repeticao = 'todo_mes';
@@ -104,9 +123,29 @@ class LancamentoForm extends Component
         $this->subcategoria_id = null;
     }
 
-    public function updatedValor($valor): void
+    public function updatedFormaPagamento(): void
     {
-        $this->valor = $this->converterValor($valor);
+        if ($this->forma_pagamento === 'cartao') {
+            $this->categoria_id = null;
+            $this->subcategoria_id = null;
+            $this->pago = true;
+            $this->cartao_debito = false;
+        }
+    }
+
+    public function updatedCartaoDebito(): void
+    {
+        if ($this->forma_pagamento !== 'cartao') {
+            return;
+        }
+
+        if ($this->cartao_debito) {
+            $this->pago = true;
+        } else {
+            $this->categoria_id = null;
+            $this->subcategoria_id = null;
+            $this->pago = true;
+        }
     }
 
     private function converterValor($valor): ?float
@@ -135,7 +174,6 @@ class LancamentoForm extends Component
     {
         $this->validate([
             'descricao' => ['required', 'string', 'max:150'],
-            'valor' => ['required', 'numeric', 'min:0.01'],
             'data' => ['required', 'date'],
             'tipo' => ['required', 'in:receita,despesa'],
             'categoria_id' => ['nullable', 'exists:categorias,id'],
@@ -148,7 +186,13 @@ class LancamentoForm extends Component
         ]);
 
         $valor = $this->converterValor($this->valor);
-        $this->valor = $valor !== null ? number_format($valor, 2, ',', '.') : '';
+
+        if ($valor === null || $valor < 0.01) {
+            $this->addError('valor', 'Informe um valor válido (mínimo R$ 0,01).');
+            return;
+        }
+
+        $this->valor = number_format($valor, 2, ',', '.');
 
         $user = auth()->user();
         $subcategoriaId = $this->subcategoria_id;
@@ -179,6 +223,8 @@ class LancamentoForm extends Component
                 'qtd_parcelas' => 1,
                 'parcela_atual' => 1,
                 'observacao' => $this->observacao ?: null,
+                'pago' => $this->pago,
+                'abate_saldo' => $this->abate_saldo,
             ]);
 
             session()->flash('success', 'Lançamento atualizado.');
@@ -201,6 +247,8 @@ class LancamentoForm extends Component
                 'parcela_atual' => 1,
                 'origem_id' => null,
                 'observacao' => $this->observacao ?: null,
+                'pago' => $this->pago,
+                'abate_saldo' => $this->abate_saldo,
             ]);
         } else {
             $primeiro = $user->lancamentos()->create([
@@ -217,6 +265,8 @@ class LancamentoForm extends Component
                 'parcela_atual' => 1,
                 'origem_id' => null,
                 'observacao' => $this->observacao ?: null,
+                'pago' => $this->pago,
+                'abate_saldo' => $this->abate_saldo,
             ]);
 
             for ($i = 2; $i <= $qtd; $i++) {
@@ -234,6 +284,8 @@ class LancamentoForm extends Component
                     'parcela_atual' => $i,
                     'origem_id' => $primeiro->id,
                     'observacao' => $this->observacao ?: null,
+                'pago' => $this->pago,
+                'abate_saldo' => $this->abate_saldo,
                 ]);
             }
         }

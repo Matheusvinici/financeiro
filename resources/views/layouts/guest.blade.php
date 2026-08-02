@@ -16,7 +16,7 @@
     <script>
         (function () {
             const tema = localStorage.getItem('mf-theme') || 'light';
-            document.body.setAttribute('data-bs-theme', tema);
+            document.documentElement.setAttribute('data-bs-theme', tema);
         })();
     </script>
 </head>

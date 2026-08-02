@@ -1,0 +1,40 @@
+import puppeteer from 'puppeteer-core';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+page.on('response', async r => {
+    if (r.request().method() !== 'GET' || r.url().includes('fonts') || r.url().includes('localhost')) {
+        console.log('HTTP', r.status(), r.request().method(), r.url().slice(0, 90));
+    }
+});
+page.on('requestfailed', r => console.log('FAILED', r.url().slice(0, 90), r.failure()?.errorText));
+await page.goto('http://127.0.0.1:8000/login', { waitUntil: 'networkidle0' });
+await page.type('input[name="email"]', 'matheus2vandrade@gmail.com');
+await page.type('input[name="password"]', 'Carpediem1996#');
+await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type="submit"]')]);
+console.log('apos login:', page.url());
+await page.goto('http://127.0.0.1:8000/lancamentos/create', { waitUntil: 'networkidle0' });
+console.log('create:', page.url());
+await sleep(700);
+await page.click('#tipo-despesa');
+await sleep(1200);
+await page.type('input[wire\\:model="descricao"]', 'TESTE DEBUG');
+await page.type('input[placeholder="R$ 0,00"]', '12345');
+await sleep(600);
+await page.click('#campo_pago');
+await sleep(600);
+console.log('pago:', await page.evaluate(() => document.getElementById('campo_pago').checked));
+await page.select('select[wire\\:model\\.live="forma_pagamento"]', 'cartao');
+await sleep(900);
+const catVisible = await page.evaluate(() => !document.getElementById('categoria_div').classList.contains('d-none'));
+console.log('categoria visivel com cartao (espera false):', catVisible);
+const cartaoVisible = await page.evaluate(() => !document.getElementById('cartao_div').classList.contains('d-none'));
+console.log('cartoes visivel (espera true):', cartaoVisible);
+const cartoes = await page.evaluate(() => [...document.querySelectorAll('#cartao_div option')].filter(o => o.value).map(o => o.textContent));
+console.log('cartoes:', JSON.stringify(cartoes));
+await page.click('input[wire\\:model="descricao"]');
+await sleep(800);
+await page.click('#btn-salvar');
+await sleep(4000);
+console.log('url final:', page.url());
+await browser.close();

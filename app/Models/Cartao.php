@@ -12,14 +12,22 @@ class Cartao extends Model
 
     protected $fillable = [
         'user_id', 'nome', 'tipo', 'bandeira', 'limite', 'dia_fechamento', 'dia_vencimento', 'ativo',
+        'fatura_paga_mes', 'fatura_paga_ano',
     ];
 
     protected $casts = [
         'limite' => 'decimal:2',
         'dia_fechamento' => 'integer',
         'dia_vencimento' => 'integer',
+        'fatura_paga_mes' => 'integer',
+        'fatura_paga_ano' => 'integer',
         'ativo' => 'boolean',
     ];
+
+    public function faturaPaga(int $mes, int $ano): bool
+    {
+        return (int) $this->fatura_paga_mes === $mes && (int) $this->fatura_paga_ano === $ano;
+    }
 
     public function user(): BelongsTo
     {

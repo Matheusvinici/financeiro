@@ -6,6 +6,7 @@ use App\Http\Controllers\CompartilhamentoController;
 use App\Http\Controllers\ConfiguracaoController;
 use App\Http\Controllers\ContaPagarController;
 use App\Http\Controllers\LancamentoController;
+use App\Http\Controllers\PendenciaController;
 use App\Http\Controllers\RelatorioController;
 use App\Livewire\Dashboard;
 use App\Livewire\LancamentoForm;
@@ -30,6 +31,12 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/lancamentos/{lancamento}', [LancamentoController::class, 'update'])->name('lancamentos.update');
     Route::delete('/lancamentos/{lancamento}', [LancamentoController::class, 'destroy'])->name('lancamentos.destroy');
     Route::get('/lancamentos', [LancamentoController::class, 'index'])->name('lancamentos.index');
+
+    Route::get('/pendencias', [PendenciaController::class, 'index'])->name('pendencias.index');
+    Route::post('/pendencias/{lancamento}/pagar', [PendenciaController::class, 'pagar'])->name('pendencias.pagar');
+    Route::post('/pendencias/{lancamento}/desfazer', [PendenciaController::class, 'desfazerPagamento'])->name('pendencias.desfazer');
+    Route::post('/pendencias/{lancamento}/abate', [PendenciaController::class, 'alternarAbate'])->name('pendencias.abate');
+    Route::post('/pendencias/{cartao}/fatura', [PendenciaController::class, 'pagarFatura'])->name('pendencias.fatura');
 
     Route::get('/relatorios/mensal', [RelatorioController::class, 'mensal'])->name('relatorios.mensal');
     Route::get('/relatorios/pdf', [RelatorioController::class, 'exportarPdf'])->name('relatorios.pdf');
