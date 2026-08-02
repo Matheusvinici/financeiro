@@ -68,4 +68,15 @@ class Lancamento extends Model
     {
         return $q->whereYear('data', $ano)->whereMonth('data', $mes);
     }
+
+    public function scopeQuando(Builder $q, string $periodo, int $ano, ?int $mes = null): Builder
+    {
+        $q->whereYear('data', $ano);
+
+        if ($periodo === 'mes') {
+            $q->whereMonth('data', $mes);
+        }
+
+        return $q;
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Categoria;
 use App\Models\Subcategoria;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Http\Request;
 
 class CategoriaController extends Controller
@@ -27,6 +28,9 @@ class CategoriaController extends Controller
 
         auth()->user()->categorias()->create($data);
 
+        $categoria = auth()->user()->categorias()->latest('id')->first();
+        PermissionSeeder::sincronizarCategoria($categoria);
+
         return back()->with('success', 'Categoria criada.');
     }
 
@@ -49,6 +53,7 @@ class CategoriaController extends Controller
     public function destroy(Categoria $categoria)
     {
         abort_unless($categoria->user_id === auth()->id(), 403);
+        PermissionSeeder::removerCategoria($categoria);
         $categoria->delete();
 
         return back()->with('success', 'Categoria removida.');

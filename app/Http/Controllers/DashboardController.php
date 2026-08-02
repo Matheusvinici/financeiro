@@ -12,29 +12,47 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $ano = (int) $request->input('ano', Carbon::now()->year);
         $hoje = Carbon::now();
-        $mesAtual = $hoje->month;
 
-        $receitasMes = (float) $user->lancamentos()
-            ->where('tipo', 'receita')->noMes($hoje->year, $mesAtual)->sum('valor');
-        $despesasMes = (float) $user->lancamentos()
-            ->where('tipo', 'despesa')->noMes($hoje->year, $mesAtual)->sum('valor');
+        $mes = $request->input('mes');
+        $mes = $mes === 'todos' ? 'todos' : (int) ($mes ?: $hoje->month);
+        $ano = (int) $request->input('ano', $hoje->year);
+
+        $periodo = $mes === 'todos' ? 'ano' : 'mes';
+        $mesAtual = $mes === 'todos' ? null : $mes;
+
+        $receitasMes = (float) $user->lancamentos()->where('tipo', 'receita')
+            ->quando($periodo, $ano, $mesAtual)->sum('valor');
+        $despesasMes = (float) $user->lancamentos()->where('tipo', 'despesa')
+            ->quando($periodo, $ano, $mesAtual)->sum('valor');
         $saldoMes = $receitasMes - $despesasMes;
 
-        $mesAnterior = $hoje->copy()->subMonth();
-        $receitasMesAnterior = (float) $user->lancamentos()
-            ->where('tipo', 'receita')->noMes($mesAnterior->year, $mesAnterior->month)->sum('valor');
-        $despesasMesAnterior = (float) $user->lancamentos()
-            ->where('tipo', 'despesa')->noMes($mesAnterior->year, $mesAnterior->month)->sum('valor');
+        $periodoAnterior = $mes === 'todos'
+            ? Carbon::create($ano - 1, 1, 1)
+            : Carbon::create($ano, $mes, 1)->subMonth();
+
+        $receitasMesAnterior = (float) $user->lancamentos()->where('tipo', 'receita')
+            ->quando($mes === 'todos' ? 'ano' : 'mes', $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
+        $despesasMesAnterior = (float) $user->lancamentos()->where('tipo', 'despesa')
+            ->quando($mes === 'todos' ? 'ano' : 'mes', $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
         $saldoMesAnterior = $receitasMesAnterior - $despesasMesAnterior;
 
-        $saldoAno = (float) $user->lancamentos()->whereYear('data', $hoje->year)
+        $saldoAno = (float) $user->lancamentos()->whereYear('data', $ano)
             ->get()->sum(fn ($l) => $l->tipo === 'receita' ? $l->valor : -$l->valor);
 
         $contasAberto = ContaPagar::where('user_id', $user->id)
             ->where('status', '!=', 'pago')->get();
         $totalContasAberto = $contasAberto->sum('valor_restante');
+
+        // ----- Meses disponíveis (com dados ou atuais) -----
+        $mesesDisponiveis = $user->lancamentos()
+            ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')
+            ->distinct()->orderByDesc('ano')->orderByDesc('mes')->get()
+            ->map(fn ($m) => ['ano' => (int) $m->ano, 'mes' => (int) $m->mes])
+            ->push(['ano' => $hoje->year, 'mes' => $hoje->month])
+            ->unique(fn ($m) => $m['ano'] . '-' . $m['mes'])
+            ->sortByDesc(fn ($m) => $m['ano'] * 12 + $m['mes'])
+            ->values();
 
         // ----- Alertas -----
         $alertas = [];
