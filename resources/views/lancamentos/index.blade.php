@@ -31,6 +31,19 @@
                         <option value="despesa" @selected(request('tipo') === 'despesa')>Despesas</option>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Tipo de conta</label>
+                    <div class="btn-group w-100" role="group" aria-label="Tipo de conta">
+                        <input type="radio" class="btn-check" name="conta" id="conta_todas" value="" @checked(!request('conta')) onchange="this.form.submit()">
+                        <label class="btn btn-outline-secondary btn-sm" for="conta_todas">Todas</label>
+                        <input type="radio" class="btn-check" name="conta" id="conta_fixa" value="fixa" @checked(request('conta') === 'fixa') onchange="this.form.submit()">
+                        <label class="btn btn-outline-primary btn-sm" for="conta_fixa">Fixa</label>
+                        <input type="radio" class="btn-check" name="conta" id="conta_periodo" value="periodo" @checked(request('conta') === 'periodo') onchange="this.form.submit()">
+                        <label class="btn btn-outline-warning btn-sm" for="conta_periodo">Período</label>
+                        <input type="radio" class="btn-check" name="conta" id="conta_variavel" value="variavel" @checked(request('conta') === 'variavel') onchange="this.form.submit()">
+                        <label class="btn btn-outline-info btn-sm" for="conta_variavel">Variáveis</label>
+                    </div>
+                </div>
                 <div class="col-md-2">
                     <label class="form-label small">Categoria</label>
                     <select name="categoria_id" class="form-select">
@@ -137,6 +150,14 @@
                                             data-url="{{ route('lancamentos.alterarValor', $l) }}"
                                             data-nome="{{ $l->descricao }}"
                                             data-valor="{{ $l->valor }}"><i class="fa-solid fa-circle-dollar me-1"></i>Valor</button>
+                                        <form method="POST" action="{{ route('pendencias.abate', $l) }}" class="d-inline">
+                                            @csrf
+                                            @if ($l->abate_saldo)
+                                                <button class="btn btn-sm btn-outline-info" title="Passar a não abater do saldo (em todos os meses)"><i class="fa-solid fa-ban me-1"></i>Não abate</button>
+                                            @else
+                                                <button class="btn btn-sm btn-outline-success" title="Passar a abater do saldo (em todos os meses)"><i class="fa-solid fa-check me-1"></i>Abate</button>
+                                            @endif
+                                        </form>
                                         <form method="POST" action="{{ route('lancamentos.pausar', $l) }}" class="d-inline" onsubmit="return confirm('{{ $l->isParcela() ? 'Pausar estas parcelas' : 'Desativar esta conta fixa' }}? Os lançamentos futuros serão removidos e o histórico preservado.')">
                                             @csrf
                                             <button class="btn btn-sm btn-outline-secondary" title="{{ $l->isParcela() ? 'Pausar parcelas futuras' : 'Desativar conta fixa' }}"><i class="fa-solid fa-pause me-1"></i>{{ $l->isParcela() ? 'Pausar' : 'Desativar' }}</button>
@@ -188,10 +209,24 @@
                             <label class="form-label">Novo valor (R$)</label>
                             <input type="number" step="0.01" min="0.01" name="novo_valor" id="modalValorValor" class="form-control" required>
                         </div>
-                        <div class="mb-3" id="modalValorMesWrap">
-                            <label class="form-label">A partir de</label>
-                            <input type="month" name="mes_inicio" id="modalValorMes" class="form-control" value="{{ now()->format('Y-m') }}">
-                            <div class="form-text">Os lançamentos anteriores a esta data são preservados.</div>
+                        <div class="mb-3" id="modalValorAplicacao">
+                            <label class="form-label">Aplicar em</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="aplicacao" id="apl_todos" value="todos" checked>
+                                <label class="form-check-label" for="apl_todos">Todos os meses da conta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="aplicacao" id="apl_mes" value="mes">
+                                <label class="form-check-label" for="apl_mes">Somente neste mês</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="aplicacao" id="apl_apartir" value="apartir">
+                                <label class="form-check-label" for="apl_apartir">A partir de</label>
+                            </div>
+                            <div id="modalValorMesWrap" class="mt-2 d-none">
+                                <input type="month" name="mes_inicio" id="modalValorMes" class="form-control" value="{{ now()->format('Y-m') }}">
+                                <div class="form-text">Os lançamentos anteriores a esta data são preservados.</div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -211,10 +246,25 @@
                     f.action = btn.dataset.url;
                     document.getElementById('modalValorTitulo').textContent = 'Alterar valor — ' + btn.dataset.nome;
                     document.getElementById('modalValorValor').value = btn.dataset.valor;
-                    const wrap = document.getElementById('modalValorMesWrap');
-                    wrap.style.display = btn.dataset.semMes ? 'none' : '';
-                    if (!btn.dataset.semMes) {
-                        document.getElementById('modalValorMes').value = '{{ now()->format('Y-m') }}';
+                    const aplicacao = document.getElementById('modalValorAplicacao');
+                    aplicacao.style.display = btn.dataset.semMes ? 'none' : '';
+                    if (btn.dataset.semMes) {
+                        document.getElementById('apl_todos').checked = true;
+                    }
+                    const mesWrap = document.getElementById('modalValorMesWrap');
+                    mesWrap.classList.add('d-none');
+                    document.getElementById('apl_todos').checked = true;
+                    document.getElementById('modalValorMes').value = '{{ now()->format('Y-m') }}';
+                });
+            });
+
+            document.querySelectorAll('input[name="aplicacao"]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    const mesWrap = document.getElementById('modalValorMesWrap');
+                    if (radio.value === 'apartir' && radio.checked) {
+                        mesWrap.classList.remove('d-none');
+                    } else {
+                        mesWrap.classList.add('d-none');
                     }
                 });
             });

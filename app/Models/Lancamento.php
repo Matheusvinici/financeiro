@@ -63,6 +63,36 @@ class Lancamento extends Model
         return $this->qtd_parcelas > 1;
     }
 
+    public function serieRelacionada(): \Illuminate\Support\Collection
+    {
+        if ($this->assinatura_id) {
+            return collect([$this]);
+        }
+
+        if ($this->isParcela()) {
+            $origem = $this->origem_id ? self::find($this->origem_id) : $this;
+
+            return self::where('user_id', $this->user_id)
+                ->where(function ($q) use ($origem) {
+                    $q->where('id', $origem->id)->orWhere('origem_id', $origem->id);
+                })
+                ->orderBy('parcela_atual')
+                ->get();
+        }
+
+        if ($this->recorrente) {
+            return self::where('user_id', $this->user_id)
+                ->where('descricao', $this->descricao)
+                ->where('tipo', $this->tipo)
+                ->whereNull('assinatura_id')
+                ->where('recorrente', true)
+                ->orderBy('data')
+                ->get();
+        }
+
+        return collect([$this]);
+    }
+
     public function isPendente(): bool
     {
         return $this->tipo === 'despesa' && !$this->pago;

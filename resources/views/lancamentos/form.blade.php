@@ -11,6 +11,14 @@
                 @csrf
                 @if ($lancamento->exists) @method('PUT') @endif
 
+                @if ($lancamento->exists && ($lancamento->recorrente || $lancamento->isParcela()) && !$lancamento->assinatura_id)
+                    <div class="alert alert-info py-2">
+                        <i class="fa-solid fa-link me-1"></i>
+                        Esta é uma conta {{ $lancamento->isParcela() ? 'parcelada' : 'fixa' }}: descrição, categoria, forma de pagamento e observação valem para <strong>todos os meses</strong>.
+                        Data e valor continuam por mês (use o botão "Valor" da lista para alterar de um mês em diante).
+                    </div>
+                @endif
+
                 {{-- Passo 1: tipo --}}
                 <div class="row g-3 mb-4">
                     <div class="col-12">

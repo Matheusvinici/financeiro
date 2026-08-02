@@ -20,6 +20,14 @@ class LancamentoController extends Controller
         if ($request->filled('tipo')) {
             $query->where('tipo', $request->tipo);
         }
+        if ($request->filled('conta')) {
+            match ($request->conta) {
+                'fixa' => $query->where('recorrente', true),
+                'periodo' => $query->where('qtd_parcelas', '>', 1),
+                'variavel' => $query->where('recorrente', false)->where('qtd_parcelas', 1)->whereNull('assinatura_id'),
+                default => null,
+            };
+        }
         if ($request->filled('categoria_id')) {
             $query->where('categoria_id', $request->categoria_id);
         }
@@ -105,9 +113,21 @@ class LancamentoController extends Controller
         abort_unless($lancamento->user_id === auth()->id(), 403);
 
         $data = $this->validar($request);
-        $lancamento->update($this->campos($data, $lancamento->qtd_parcelas, $lancamento->parcela_atual, $lancamento->origem_id));
 
-        return redirect()->route('lancamentos.index')->with('success', 'Lançamento atualizado.');
+        foreach ($lancamento->serieRelacionada() as $item) {
+            $campos = $this->campos($data, $item->qtd_parcelas, $item->parcela_atual, $item->origem_id);
+
+            if ($item->id !== $lancamento->id) {
+                unset($campos['data'], $campos['valor']);
+            }
+
+            $item->update($campos);
+        }
+
+        $total = $lancamento->serieRelacionada()->count();
+
+        return redirect()->route('lancamentos.index')
+            ->with('success', $total > 1 ? 'Lançamento atualizado em todos os ' . $total . ' meses da conta.' : 'Lançamento atualizado.');
     }
 
     public function destroy(Lancamento $lancamento)
@@ -132,21 +152,32 @@ class LancamentoController extends Controller
 
         $data = $this->validate($request, [
             'novo_valor' => ['required', 'numeric', 'min:0.01'],
-            'mes_inicio' => ['required', 'date_format:Y-m'],
+            'aplicacao' => ['required', 'in:todos,mes,apartir'],
+            'mes_inicio' => ['nullable', 'required_if:aplicacao,apartir', 'date_format:Y-m'],
         ]);
 
-        $inicio = Carbon::createFromFormat('Y-m', $data['mes_inicio'])->startOfMonth();
+        $aplicacao = $data['aplicacao'];
+        $inicio = isset($data['mes_inicio']) ? Carbon::createFromFormat('Y-m', $data['mes_inicio'])->startOfMonth() : null;
         $atualizados = 0;
 
-        foreach ($this->seriePara($lancamento) as $l) {
-            if ($l->data->gte($inicio)) {
-                $l->update(['valor' => $data['novo_valor']]);
-                $atualizados++;
+        foreach ($lancamento->serieRelacionada() as $l) {
+            if ($aplicacao === 'mes' && $l->id !== $lancamento->id) {
+                continue;
             }
+            if ($aplicacao === 'apartir' && !$l->data->gte($inicio)) {
+                continue;
+            }
+            $l->update(['valor' => $data['novo_valor']]);
+            $atualizados++;
         }
 
-        return back()->with('success', "Valor atualizado em {$atualizados} lançamento(s) a partir de " .
-            $inicio->translatedFormat('m/Y') . '.');
+        $mensagem = match ($aplicacao) {
+            'mes' => 'Valor atualizado somente neste mês.',
+            'apartir' => "Valor atualizado em {$atualizados} lançamento(s) a partir de " . $inicio->translatedFormat('m/Y') . '.',
+            default => "Valor atualizado em todos os {$atualizados} lançamentos da conta.",
+        };
+
+        return back()->with('success', $mensagem);
     }
 
     public function pausar(Lancamento $lancamento)
@@ -154,39 +185,12 @@ class LancamentoController extends Controller
         abort_unless($lancamento->user_id === auth()->id(), 403);
         abort_if($lancamento->assinatura_id, 403, 'Use a opção da assinatura.');
 
-        $serie = $lancamento->isParcela() ? $this->lancamentosSerie($lancamento) : $this->serieFixa($lancamento);
-
-        $removidos = $serie
+        $removidos = $lancamento->serieRelacionada()
             ->filter(fn ($l) => $l->data->gt(now()->endOfMonth()))
             ->each->delete()
             ->count();
 
         return back()->with('success', "Pausado: {$removidos} lançamento(s) futuro(s) removido(s). O histórico foi preservado.");
-    }
-
-    private function seriePara(Lancamento $lancamento)
-    {
-        if ($lancamento->isParcela()) {
-            return $this->lancamentosSerie($lancamento);
-        }
-
-        if ($lancamento->recorrente) {
-            return $this->serieFixa($lancamento);
-        }
-
-        return collect([$lancamento]);
-    }
-
-    private function serieFixa(Lancamento $lancamento)
-    {
-        return Lancamento::where('user_id', $lancamento->user_id)
-            ->where('descricao', $lancamento->descricao)
-            ->where('tipo', $lancamento->tipo)
-            ->where('categoria_id', $lancamento->categoria_id)
-            ->whereNull('assinatura_id')
-            ->where('recorrente', true)
-            ->orderBy('data')
-            ->get();
     }
 
     private function lancamentosSerie(Lancamento $lancamento)
@@ -231,15 +235,15 @@ class LancamentoController extends Controller
             'descricao' => $parcelaAtual > 1 ? $data['descricao'] . " ({$parcelaAtual}/{$qtdParcelas})" : $data['descricao'],
             'valor' => $data['valor'],
             'tipo' => $data['tipo'],
-            'categoria_id' => $data['categoria_id'] ?: null,
-            'subcategoria_id' => $data['subcategoria_id'] ?: null,
-            'forma_pagamento' => $data['forma_pagamento'] ?: null,
-            'cartao_id' => $data['cartao_id'] ?: null,
+            'categoria_id' => $data['categoria_id'] ?? null,
+            'subcategoria_id' => $data['subcategoria_id'] ?? null,
+            'forma_pagamento' => $data['forma_pagamento'] ?? null,
+            'cartao_id' => $data['cartao_id'] ?? null,
             'recorrente' => $data['recorrente'] ?? false,
             'qtd_parcelas' => $qtdParcelas,
             'parcela_atual' => $parcelaAtual,
             'origem_id' => $origemId,
-            'observacao' => $data['observacao'] ?: null,
+            'observacao' => $data['observacao'] ?? null,
         ];
     }
 

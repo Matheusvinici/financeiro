@@ -163,8 +163,17 @@ class PendenciaController extends Controller
     {
         abort_unless($lancamento->user_id === auth()->id(), 403);
 
-        $lancamento->update(['abate_saldo' => !$lancamento->abate_saldo]);
+        $novo = !$lancamento->abate_saldo;
+        $serie = $lancamento->serieRelacionada();
 
-        return back()->with('success', $lancamento->abate_saldo ? 'Agora abate do saldo.' : 'Agora não abate do saldo.');
+        foreach ($serie as $item) {
+            $item->update(['abate_saldo' => $novo]);
+        }
+
+        $qtd = $serie->count();
+
+        return back()->with('success', $qtd > 1
+            ? ($novo ? "Conta passa a abater do saldo em todos os {$qtd} meses." : "Conta passa a não abater do saldo em nenhum dos {$qtd} meses.")
+            : ($novo ? 'Agora abate do saldo.' : 'Agora não abate do saldo.'));
     }
 }
