@@ -8,6 +8,7 @@ use App\Models\ContaPagar;
 use App\Models\Lancamento;
 use App\Models\Subcategoria;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -18,9 +19,10 @@ class ImportarPlanilha extends Command
         {--user= : ID ou e-mail do usuário (padrão: primeiro usuário)}
         {--anos=* : Anos a importar, ex. --anos=2025 --anos=2026 (padrão: todos)}
         {--arquivo=database/contas.xlsx : Caminho da planilha}
+        {--base : Importa apenas categorias e cartões, sem lançamentos nem contas a pagar}
         {--limpar : Apaga os dados financeiros do usuário antes de importar}';
 
-    protected $description = 'Importa o arquivo contas.xlsx (2021-2027) para o sistema financeiro';
+    protected $description = 'Importa o arquivo contas.xlsx (2021-2027) para o sistema financeiro (--base = só categorias e cartões)';
 
     private const CORES = [
         'RECEITAS' => '#198754',
@@ -122,7 +124,9 @@ class ImportarPlanilha extends Command
 
             $this->info("Aba {$nomeAba} ({$ano}): " . count($rows) . ' linhas');
 
-            if ($this->ehLayoutNovo($rows)) {
+            if ($this->option('base')) {
+                $importados = $this->importarBase($user, $rows);
+            } elseif ($this->ehLayoutNovo($rows)) {
                 $importados = $this->importarAnoNovo($user, $ano, $rows);
             } else {
                 $importados = $this->importarAnoAntigo($user, $ano, $rows);
@@ -134,12 +138,37 @@ class ImportarPlanilha extends Command
 
         $spreadsheet->disconnectWorksheets();
 
-        $importadas = $this->importarDividas($user);
-        $this->info("Contas a pagar criadas: {$importadas}");
+        if ($this->option('base')) {
+            $this->garantirCartoesBase($user);
+            $this->sincronizarPermissoesCategorias($user);
+            $this->info('Modo base: contas a pagar ignoradas.');
+        } else {
+            $importadas = $this->importarDividas($user);
+            $this->info("Contas a pagar criadas: {$importadas}");
+        }
 
         $this->info("Lançamentos importados no total: {$totalLancamentos}");
 
         return self::SUCCESS;
+    }
+
+    private function garantirCartoesBase(User $user): void
+    {
+        foreach (['Nubank', 'Inter', 'Bola', 'Cartão'] as $nome) {
+            Cartao::firstOrCreate(
+                ['user_id' => $user->id, 'nome' => $nome],
+                ['tipo' => 'credito', 'bandeira' => null, 'limite' => 0, 'ativo' => true]
+            );
+        }
+
+        $this->info('Cartões garantidos: ' . $user->cartoes()->pluck('nome')->implode(', '));
+    }
+
+    private function sincronizarPermissoesCategorias(User $user): void
+    {
+        foreach ($user->categorias as $categoria) {
+            PermissionSeeder::sincronizarCategoria($categoria);
+        }
     }
 
     private function resolverUsuario(): ?User
@@ -169,6 +198,38 @@ class ImportarPlanilha extends Command
         $texto = mb_strtolower((string) ($linhaCabecalho[2] ?? ''));
 
         return in_array($texto, ['jan', 'jan.']);
+    }
+
+    private function importarBase(User $user, array $rows): int
+    {
+        $grupoAtual = null;
+
+        foreach ($rows as $linha) {
+            $colA = trim((string) ($linha[0] ?? ''));
+            $colB = trim((string) ($linha[1] ?? ''));
+
+            if ($this->ehLinhaDeControle($colA, $colB)) {
+                continue;
+            }
+
+            $grupo = $this->normalizarGrupo($colA);
+            if ($grupo) {
+                $grupoAtual = $grupo;
+                $this->obterCategoria($user, $grupo);
+                continue;
+            }
+
+            $ehItem = $colB !== '' && !is_numeric(str_replace(',', '.', $colB));
+            if (!$ehItem || !$grupoAtual) {
+                continue;
+            }
+
+            if ($grupoAtual === 'CARTÕES') {
+                $this->cartaoParaItem($user, $colB, $grupoAtual);
+            }
+        }
+
+        return 0;
     }
 
     private function importarAnoNovo(User $user, int $ano, array $rows): int
