@@ -27,6 +27,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/cartoes/assinaturas', [AssinaturaController::class, 'store'])->name('assinaturas.store');
     Route::put('/cartoes/assinaturas/{assinatura}', [AssinaturaController::class, 'update'])->name('assinaturas.update');
     Route::delete('/cartoes/assinaturas/{assinatura}', [AssinaturaController::class, 'destroy'])->name('assinaturas.destroy');
+    Route::post('/assinaturas/{assinatura}/toggle', [AssinaturaController::class, 'toggle'])->name('assinaturas.toggle');
     Route::post('/cartoes/ajustes', [CartaoController::class, 'storeAjuste'])->name('cartoes.ajustes.store');
     Route::delete('/cartoes/ajustes/{lancamento}', [CartaoController::class, 'destroyAjuste'])->name('cartoes.ajustes.destroy');
 

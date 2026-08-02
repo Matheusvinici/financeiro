@@ -63,6 +63,23 @@ class Dashboard extends Component
             ->where('abate_saldo', true)->quando($periodo, $ano, $mesAtual)->sum('valor');
         $saldoMes = $receitasMes - $despesasMes;
 
+        $assinaturasPrevistas = 0.0;
+
+        if ($mes !== 'todos' && $ano === $hoje->year && $mes === $hoje->month) {
+            $jaLancadas = $user->lancamentos()
+                ->whereNotNull('assinatura_id')
+                ->whereYear('data', $ano)->whereMonth('data', $mes)
+                ->pluck('assinatura_id')->all();
+
+            $assinaturasPrevistas = (float) $user->assinaturas()
+                ->where('ativo', true)
+                ->whereNotIn('id', $jaLancadas)
+                ->sum('valor');
+
+            $despesasMes += $assinaturasPrevistas;
+            $saldoMes = $receitasMes - $despesasMes;
+        }
+
         if ($mes === 'todos') {
             $periodoAnterior = Carbon::create($ano - 1, 1, 1);
             $periodoAnt = 'ano';
@@ -176,7 +193,8 @@ class Dashboard extends Component
             'user', 'ano', 'mes', 'hoje', 'mesAtual', 'periodo', 'mesesDisponiveis',
             'receitasMes', 'despesasMes', 'saldoMes',
             'receitasMesAnterior', 'despesasMesAnterior', 'saldoMesAnterior',
-            'saldoAno', 'totalContasAberto', 'alertas', 'simulador', 'graficos', 'ultimos'
+            'saldoAno', 'totalContasAberto', 'alertas', 'simulador', 'graficos', 'ultimos',
+            'assinaturasPrevistas'
         ));
     }
 

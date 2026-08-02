@@ -57,7 +57,11 @@
             <div class="stat-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
             <div class="stat-value">R$ {{ number_format($despesasMes, 2, ',', '.') }}</div>
             <div class="stat-label">Despesas de {{ $rotuloPeriodo }}</div>
-            <div class="stat-sub"><a href="{{ route('lancamentos.index', ['tipo' => 'despesa']) }}">Ver lançamentos <i class="fa-solid fa-arrow-right ms-1"></i></a></div>
+            @if ($assinaturasPrevistas > 0)
+                <div class="stat-sub">Inclui R$ {{ number_format($assinaturasPrevistas, 2, ',', '.') }} em assinaturas previstas</div>
+            @else
+                <div class="stat-sub"><a href="{{ route('lancamentos.index', ['tipo' => 'despesa']) }}">Ver lançamentos <i class="fa-solid fa-arrow-right ms-1"></i></a></div>
+            @endif
         </div>
 
         <div class="stat-card {{ $saldoMes >= 0 ? 'blue' : 'purple' }}">

@@ -81,23 +81,34 @@
                     </thead>
                     <tbody>
                         @forelse ($lancamentos as $l)
-                            <tr>
-                                <td class="text-nowrap">{{ $l->data->translatedFormat('d/m/Y') }}</td>
-                                <td>
-                                    {{ $l->descricao }}
-                                    @if ($l->isParcela())<span class="badge bg-secondary ms-1">parcela {{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
-                                    @if ($l->recorrente)<span class="badge bg-info ms-1">fixo</span>@endif
-                                    @if ($l->tipo === 'despesa' && !$l->pago && ($l->forma_pagamento !== 'cartao' || $l->cartao_debito))<span class="badge bg-danger ms-1">a pagar</span>@endif
-                                    @if (!$l->abate_saldo)<span class="badge bg-info text-dark ms-1">não abate</span>@endif
-                                    @if ($l->observacao)<div class="small text-muted">{{ $l->observacao }}</div>@endif
+                            @php $assinatura = $l->assinatura_id ? ($assinaturas[$l->assinatura_id] ?? null) : null; @endphp
+                            <tr @if ($assinatura) class="table-warning" @endif>
+                                <td class="text-nowrap">
+                                    @if ($assinatura)<span class="badge bg-warning text-dark me-1">mensal</span>@endif
+                                    {{ $l->data->translatedFormat('d/m/Y') }}
                                 </td>
                                 <td>
-                                    <i class="fa-solid {{ $l->categoria?->icone ?? 'fa-tag' }} me-1" style="color: {{ $l->categoria?->cor ?? '#6c757d' }}"></i>
-                                    {{ $l->categoria?->nome ?? '—' }}
-                                    @if ($l->subcategoria)<span class="text-muted">/ {{ $l->subcategoria->nome }}</span>@endif
+                                    @if ($assinatura)
+                                        <i class="fa-solid fa-arrows-rotate me-1 text-warning"></i>{{ $assinatura->nome }}
+                                        <span class="badge bg-warning text-dark ms-1">assinatura</span>
+                                        @if ($assinatura->ativo)<span class="badge bg-success ms-1">ativa</span>@else<span class="badge bg-secondary ms-1">desativada</span>@endif
+                                        @if ($l->tipo === 'despesa' && !$l->pago && ($l->forma_pagamento !== 'cartao' || $l->cartao_debito))<span class="badge bg-danger ms-1">a pagar</span>@endif
+                                        @if ($assinatura->observacao)<div class="small text-muted">{{ $assinatura->observacao }}</div>@endif
+                                    @else
+                                        {{ $l->descricao }}
+                                        @if ($l->isParcela())<span class="badge bg-secondary ms-1">parcela {{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
+                                        @if ($l->recorrente)<span class="badge bg-info ms-1">fixo</span>@endif
+                                        @if ($l->tipo === 'despesa' && !$l->pago && ($l->forma_pagamento !== 'cartao' || $l->cartao_debito))<span class="badge bg-danger ms-1">a pagar</span>@endif
+                                        @if (!$l->abate_saldo)<span class="badge bg-info text-dark ms-1">não abate</span>@endif
+                                        @if ($l->observacao)<div class="small text-muted">{{ $l->observacao }}</div>@endif
+                                    @endif
                                 </td>
                                 <td>
-                                    @if ($l->cartao)<span class="badge bg-dark">{{ $l->cartao->nome }}</span>
+                                    <i class="fa-solid {{ ($assinatura?->categoria ?? $l->categoria)?->icone ?? 'fa-tag' }} me-1" style="color: {{ ($assinatura?->categoria ?? $l->categoria)?->cor ?? '#6c757d' }}"></i>
+                                    {{ ($assinatura?->categoria ?? $l->categoria)?->nome ?? '—' }}
+                                </td>
+                                <td>
+                                    @if ($assinatura?->cartao ?? $l->cartao)<span class="badge bg-dark">{{ ($assinatura?->cartao ?? $l->cartao)->nome }}</span>
                                     @else <span class="text-muted">{{ $l->forma_pagamento ? $l->forma_label : '—' }}</span>
                                     @endif
                                 </td>
@@ -105,11 +116,22 @@
                                     {{ $l->tipo === 'receita' ? '+' : '-' }}R$ {{ number_format($l->valor, 2, ',', '.') }}
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Editar</a>
-                                    <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento{{ $l->isParcela() ? ' e toda a série de parcelas' : '' }}?')">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
-                                    </form>
+                                    @if ($assinatura)
+                                        <form method="POST" action="{{ route('assinaturas.toggle', $assinatura) }}" class="d-inline">
+                                            @csrf
+                                            @if ($assinatura->ativo)
+                                                <button class="btn btn-sm btn-outline-secondary" title="Desativar assinatura"><i class="fa-solid fa-pause me-1"></i>Desativar</button>
+                                            @else
+                                                <button class="btn btn-sm btn-outline-success" title="Ativar assinatura"><i class="fa-solid fa-play me-1"></i>Ativar</button>
+                                            @endif
+                                        </form>
+                                    @else
+                                        <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Editar</a>
+                                        <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento{{ $l->isParcela() ? ' e toda a série de parcelas' : '' }}?')">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

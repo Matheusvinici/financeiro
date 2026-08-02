@@ -13,11 +13,10 @@ class LancamentoController extends Controller
         $user = auth()->user();
         $query = $user->lancamentos()->with(['categoria', 'subcategoria', 'cartao', 'origem']);
 
-        if ($request->filled('mes') || $request->filled('ano')) {
-            $mes = (int) $request->input('mes', now()->month);
-            $ano = (int) $request->input('ano', now()->year);
-            $query->noMes($ano, $mes);
-        }
+        $mes = max(1, min(12, (int) $request->input('mes', now()->month)));
+        $ano = (int) $request->input('ano', now()->year);
+        $query->noMes($ano, $mes);
+
         if ($request->filled('tipo')) {
             $query->where('tipo', $request->tipo);
         }
@@ -33,10 +32,26 @@ class LancamentoController extends Controller
 
         $lancamentos = $query->orderByDesc('data')->orderByDesc('id')->paginate(30)->withQueryString();
 
+        $colecao = $lancamentos->getCollection();
+        $assinaturaIds = $colecao->whereNotNull('assinatura_id')->pluck('assinatura_id')->unique();
+        $assinaturas = $user->assinaturas()->with(['categoria', 'cartao'])
+            ->whereIn('id', $assinaturaIds)->get()->keyBy('id');
+
+        if ($assinaturaIds->isNotEmpty()) {
+            $agrupados = $colecao->whereNotNull('assinatura_id')
+                ->groupBy('assinatura_id')
+                ->map(fn ($g) => $g->sortByDesc('data')->first());
+            $colecao = $colecao->whereNull('assinatura_id')
+                ->concat($agrupados)
+                ->sortByDesc('data')->sortByDesc('id')
+                ->values();
+            $lancamentos->setCollection($colecao);
+        }
+
         $categorias = $user->categorias()->orderBy('tipo')->orderBy('nome')->get();
         $cartoes = $user->cartoes()->orderBy('nome')->get();
 
-        return view('lancamentos.index', compact('lancamentos', 'categorias', 'cartoes'));
+        return view('lancamentos.index', compact('lancamentos', 'categorias', 'cartoes', 'assinaturas'));
     }
 
     public function create()

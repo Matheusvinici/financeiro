@@ -49,6 +49,16 @@ class AssinaturaController extends Controller
         return back()->with('success', 'Assinatura atualizada.');
     }
 
+    public function toggle(Assinatura $assinatura)
+    {
+        abort_unless($assinatura->user_id === auth()->id(), 403);
+
+        $assinatura->update(['ativo' => !$assinatura->ativo]);
+        $assinatura->sincronizarLancamentos();
+
+        return back()->with('success', 'Assinatura ' . ($assinatura->ativo ? 'ativada' : 'desativada') . '.');
+    }
+
     public function destroy(Assinatura $assinatura)
     {
         abort_unless($assinatura->user_id === auth()->id(), 403);
