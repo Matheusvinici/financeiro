@@ -45,25 +45,34 @@ class PendenciaController extends Controller
             ->limit(50)
             ->get();
 
-        $faturasCartao = $user->lancamentos()
+        $comprasCartao = $user->lancamentos()
             ->with('cartao')
             ->where('tipo', 'despesa')
             ->where('forma_pagamento', 'cartao')
             ->where('cartao_debito', false)
             ->whereNotNull('cartao_id')
+            ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
             ->get()
-            ->filter(fn ($l) => $l->cartao !== null)
-            ->groupBy(fn ($l) => $l->cartao->faturaChave($l->data))
-            ->map(function ($g) use ($mesAtual, $ano) {
-                [$fAno, $fMes] = array_map('intval', explode('-', $g->first()->cartao->faturaChave($g->first()->data)));
+            ->filter(fn ($l) => $l->cartao !== null);
+
+        $faturasCartao = $comprasCartao
+            ->groupBy(fn ($l) => $l->cartao_id . '|' . $l->cartao->faturaChave($l->data))
+            ->map(function ($g, $key) {
+                [$cId, $chave] = explode('|', $key);
+                [$fAno, $fMes] = array_map('intval', explode('-', $chave));
+
+                $vencimento = Carbon::create($fAno, $fMes, min(
+                    (int) ($g->first()->cartao->dia_vencimento ?: 1),
+                    Carbon::create($fAno, $fMes, 1)->daysInMonth
+                ));
 
                 return [
                     'cartao' => $g->first()->cartao,
                     'fatura_ano' => $fAno,
                     'fatura_mes' => $fMes,
+                    'vencimento' => $vencimento,
                     'total' => round($g->sum('valor'), 2),
-                    'pago' => $mesAtual !== null && $fMes === $mesAtual && $fAno === $ano
-                        && $g->first()->cartao->faturaPaga($fMes, $fAno),
+                    'pago' => $g->first()->cartao->faturaPaga($fMes, $fAno),
                     'qtd' => $g->count(),
                 ];
             })
@@ -72,19 +81,15 @@ class PendenciaController extends Controller
         $faturaPendentes = $mesAtual === null
             ? collect()
             : $faturasCartao->filter(fn ($f) => !$f['pago'])
-                ->map(function ($f) {
-                    $c = $f['cartao'];
-                    $dia = (int) ($c->dia_vencimento ?: 1);
-                    $diasNoMes = Carbon::create($f['fatura_ano'], $f['fatura_mes'], 1)->daysInMonth;
-
-                    return (object) [
-                        'is_fatura' => true,
-                        'fatura_cartao' => $c,
-                        'fatura_total' => $f['total'],
-                        'fatura_qtd' => $f['qtd'],
-                        'data' => Carbon::create($f['fatura_ano'], $f['fatura_mes'], min($dia, $diasNoMes)),
-                    ];
-                });
+                ->map(fn ($f) => (object) [
+                    'is_fatura' => true,
+                    'fatura_cartao' => $f['cartao'],
+                    'fatura_total' => $f['total'],
+                    'fatura_qtd' => $f['qtd'],
+                    'fatura_mes' => $f['fatura_mes'],
+                    'fatura_ano' => $f['fatura_ano'],
+                    'data' => $f['vencimento'],
+                ]);
 
         $pendentes = $pendencias->concat($faturaPendentes)
             ->sortBy(fn ($i) => $i->data ? $i->data->toDateString() : '9999-12-31')
@@ -105,23 +110,6 @@ class PendenciaController extends Controller
         if ($mesAtual !== null) {
             $totalPago += $faturasCartao->where('pago', true)->sum('total');
         }
-
-        $faturasCartao = $user->lancamentos()
-            ->with('cartao')
-            ->where('tipo', 'despesa')
-            ->where('forma_pagamento', 'cartao')
-            ->where('cartao_debito', false)
-            ->whereNotNull('cartao_id')
-            ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
-            ->get()
-            ->groupBy('cartao_id')
-            ->map(fn ($g) => [
-                'cartao' => $g->first()->cartao,
-                'total' => round($g->sum('valor'), 2),
-                'pago' => $mesAtual !== null && $g->first()->cartao->faturaPaga($mesAtual, $ano),
-                'qtd' => $g->count(),
-            ])
-            ->values();
 
         $mesesDisponiveis = $user->lancamentos()
             ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')

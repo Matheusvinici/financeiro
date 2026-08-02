@@ -1,0 +1,13 @@
+import puppeteer from 'puppeteer-core';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+await page.goto('http://127.0.0.1:8000/login', { waitUntil: 'networkidle0' });
+await page.type('input[name="email"]', 'matheus2vandrade@gmail.com');
+await page.type('input[name="password"]', 'Carpediem1996#');
+await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type="submit"]')]);
+await page.goto('http://127.0.0.1:8000/pendencias?mes=8&ano=2026', { waitUntil: 'networkidle0' });
+await sleep(500);
+const forms = await page.evaluate(() => [...document.querySelectorAll('form')].map(f => ({ action: f.action, hidden: [...f.querySelectorAll('input[type=hidden]')].map(i => i.name + '=' + i.value) })));
+console.log(JSON.stringify(forms, null, 1));
+await browser.close();

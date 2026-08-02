@@ -40,7 +40,7 @@ class Cartao extends Model
         $mes = $data->month;
 
         $fechamento = (int) $this->dia_fechamento;
-        if ($fechamento > 0 && $data->day > $fechamento) {
+        if ($fechamento > 0 && $data->day >= $fechamento) {
             $mes++;
             if ($mes > 12) {
                 $mes = 1;

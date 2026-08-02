@@ -120,8 +120,8 @@
                                     <td class="text-end text-nowrap">
                                         <form method="POST" action="{{ route('pendencias.fatura', $l->fatura_cartao) }}" class="d-inline">
                                             @csrf
-                                            <input type="hidden" name="mes" value="{{ $mesAtual }}">
-                                            <input type="hidden" name="ano" value="{{ $ano }}">
+                                            <input type="hidden" name="mes" value="{{ $l->fatura_mes }}">
+                                            <input type="hidden" name="ano" value="{{ $l->fatura_ano }}">
                                             <button class="btn btn-sm btn-success" title="Marcar fatura como paga"><i class="fa-solid fa-check me-1"></i>Pagar</button>
                                         </form>
                                         <a href="{{ route('cartoes.index') }}" class="btn btn-sm btn-outline-primary" title="Ver cartões"><i class="fa-solid fa-credit-card"></i></a>
@@ -197,7 +197,7 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            <th>Tipo</th>
+                            <th>Vencimento</th>
                             <th>Cartão</th>
                             <th class="text-end">Total do período</th>
                             <th>Status</th>
@@ -205,15 +205,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($faturasCartao->sortBy(fn ($f) => $f['cartao']->tipo) as $f)
+                        @foreach ($faturasCartao->sortBy(fn ($f) => $f['vencimento']) as $f)
                             @php $cartao = $f['cartao']; @endphp
                             <tr class="{{ $f['pago'] ? 'table-success-subtle' : 'table-light' }}">
-                                <td>
-                                    <span class="badge bg-{{ $cartao->tipo === 'debito' ? 'secondary' : 'info' }}">{{ $cartao->tipo_label }}</span>
+                                <td class="text-nowrap">
+                                    <strong>{{ $f['vencimento']->translatedFormat('d/m') }}</strong>
+                                    <span class="d-block small text-muted">{{ $f['vencimento']->translatedFormat('M/Y') }}</span>
                                 </td>
                                 <td>
                                     <strong>{{ $cartao->nome }}</strong>
-                                    <span class="d-block small text-muted">{{ $f['qtd'] }} compra(s) no período</span>
+                                    <span class="badge bg-{{ $cartao->tipo === 'debito' ? 'secondary' : 'info' }}">{{ $cartao->tipo_label }}</span>
+                                    <span class="d-block small text-muted">{{ $f['qtd'] }} compra(s) nesta fatura</span>
                                 </td>
                                 <td class="text-end fw-bold">R$ {{ number_format($f['total'], 2, ',', '.') }}</td>
                                 <td>
@@ -224,11 +226,11 @@
                                     @endif
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    @if (!$f['pago'] && $mesAtual !== null)
+                                    @if (!$f['pago'])
                                         <form method="POST" action="{{ route('pendencias.fatura', $cartao) }}" class="d-inline">
                                             @csrf
-                                            <input type="hidden" name="mes" value="{{ $mesAtual }}">
-                                            <input type="hidden" name="ano" value="{{ $ano }}">
+                                            <input type="hidden" name="mes" value="{{ $f['fatura_mes'] }}">
+                                            <input type="hidden" name="ano" value="{{ $f['fatura_ano'] }}">
                                             <button class="btn btn-sm btn-success" title="Marcar fatura como paga"><i class="fa-solid fa-check me-1"></i>Pagar fatura</button>
                                         </form>
                                     @endif
