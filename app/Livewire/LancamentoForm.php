@@ -42,6 +42,8 @@ class LancamentoForm extends Component
 
     public bool $cartao_debito = false;
 
+    public string $propagar = 'todos';
+
     public function mount(?Lancamento $lancamento = null): void
     {
         $this->lancamentoId = $lancamento?->id;
@@ -84,6 +86,12 @@ class LancamentoForm extends Component
     public function title(): string
     {
         return $this->lancamentoId ? 'Editar lançamento' : 'Novo lançamento';
+    }
+
+    #[Computed]
+    public function lancamento()
+    {
+        return $this->lancamentoId ? Lancamento::find($this->lancamentoId) : null;
     }
 
     #[Computed]
@@ -219,25 +227,45 @@ class LancamentoForm extends Component
             $lancamento = Lancamento::findOrFail($this->lancamentoId);
             abort_unless($lancamento->user_id === $user->id, 403);
 
-            $lancamento->update([
-                'data' => $this->data,
+            $serie = $lancamento->serieRelacionada();
+            $total = $this->propagar === 'todos' ? $serie->count() : 1;
+
+            $comuns = [
                 'descricao' => $this->descricao,
-                'valor' => $valor,
                 'tipo' => $this->tipo,
                 'categoria_id' => $this->categoria_id ?: null,
                 'subcategoria_id' => $subcategoriaId ?: null,
                 'forma_pagamento' => $this->forma_pagamento ?: null,
                 'cartao_id' => $this->forma_pagamento === 'cartao' ? $this->cartao_id : null,
                 'recorrente' => $recorrente,
-                'qtd_parcelas' => 1,
-                'parcela_atual' => 1,
                 'observacao' => $this->observacao ?: null,
-                'pago' => $this->pago,
                 'abate_saldo' => $this->abate_saldo,
                 'cartao_debito' => $this->cartao_debito,
-            ]);
+            ];
 
-            session()->flash('success', 'Lançamento atualizado.');
+            $lancamento->update(array_merge($comuns, [
+                'data' => $this->data,
+                'valor' => $valor,
+                'pago' => $this->pago,
+            ]));
+
+            if ($this->propagar === 'todos') {
+                foreach ($serie as $item) {
+                    if ($item->id === $lancamento->id) {
+                        continue;
+                    }
+
+                    $item->update(array_merge($comuns, [
+                        'descricao' => $item->parcela_atual > 1
+                            ? $this->descricao . " ({$item->parcela_atual}/{$item->qtd_parcelas})"
+                            : $this->descricao,
+                    ]));
+                }
+            }
+
+            session()->flash('success', $total > 1
+                ? "Lançamento atualizado em todos os {$total} meses da conta."
+                : 'Lançamento atualizado.');
 
             return redirect()->route('lancamentos.index');
         }

@@ -113,21 +113,26 @@ class LancamentoController extends Controller
         abort_unless($lancamento->user_id === auth()->id(), 403);
 
         $data = $this->validar($request);
+        $propagar = ($data['propagar'] ?? 'todos') === 'todos';
 
         foreach ($lancamento->serieRelacionada() as $item) {
-            $campos = $this->campos($data, $item->qtd_parcelas, $item->parcela_atual, $item->origem_id);
-
             if ($item->id !== $lancamento->id) {
-                unset($campos['data'], $campos['valor']);
+                if (!$propagar) {
+                    continue;
+                }
+                unset($data['data'], $data['valor']);
             }
 
+            $campos = $this->campos($data, $item->qtd_parcelas, $item->parcela_atual, $item->origem_id);
             $item->update($campos);
         }
 
         $total = $lancamento->serieRelacionada()->count();
 
         return redirect()->route('lancamentos.index')
-            ->with('success', $total > 1 ? 'Lançamento atualizado em todos os ' . $total . ' meses da conta.' : 'Lançamento atualizado.');
+            ->with('success', $total > 1 && $propagar
+                ? 'Lançamento atualizado em todos os ' . $total . ' meses da conta.'
+                : 'Lançamento atualizado.');
     }
 
     public function destroy(Lancamento $lancamento)
@@ -223,6 +228,8 @@ class LancamentoController extends Controller
             'recorrente' => ['nullable', 'boolean'],
             'qtd_parcelas' => ['nullable', 'integer', 'min:1', 'max:120'],
             'observacao' => ['nullable', 'string', 'max:500'],
+            'abate_saldo' => ['nullable', 'boolean'],
+            'propagar' => ['nullable', 'in:todos,mes'],
         ]);
     }
 
@@ -244,6 +251,7 @@ class LancamentoController extends Controller
             'parcela_atual' => $parcelaAtual,
             'origem_id' => $origemId,
             'observacao' => $data['observacao'] ?? null,
+            'abate_saldo' => (bool) ($data['abate_saldo'] ?? false),
         ];
     }
 

@@ -150,14 +150,6 @@
                                             data-url="{{ route('lancamentos.alterarValor', $l) }}"
                                             data-nome="{{ $l->descricao }}"
                                             data-valor="{{ $l->valor }}"><i class="fa-solid fa-circle-dollar me-1"></i>Valor</button>
-                                        <form method="POST" action="{{ route('pendencias.abate', $l) }}" class="d-inline">
-                                            @csrf
-                                            @if ($l->abate_saldo)
-                                                <button class="btn btn-sm btn-outline-info" title="Passar a não abater do saldo (em todos os meses)"><i class="fa-solid fa-ban me-1"></i>Não abate</button>
-                                            @else
-                                                <button class="btn btn-sm btn-outline-success" title="Passar a abater do saldo (em todos os meses)"><i class="fa-solid fa-check me-1"></i>Abate</button>
-                                            @endif
-                                        </form>
                                         <form method="POST" action="{{ route('lancamentos.pausar', $l) }}" class="d-inline" onsubmit="return confirm('{{ $l->isParcela() ? 'Pausar estas parcelas' : 'Desativar esta conta fixa' }}? Os lançamentos futuros serão removidos e o histórico preservado.')">
                                             @csrf
                                             <button class="btn btn-sm btn-outline-secondary" title="{{ $l->isParcela() ? 'Pausar parcelas futuras' : 'Desativar conta fixa' }}"><i class="fa-solid fa-pause me-1"></i>{{ $l->isParcela() ? 'Pausar' : 'Desativar' }}</button>

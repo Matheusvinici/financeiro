@@ -204,6 +204,26 @@
                 <label class="form-label">Observação</label>
                 <textarea wire:model="observacao" class="form-control" rows="2"></textarea>
             </div>
+
+            @php $editavel = $this->lancamento; @endphp
+            @if ($editavel && ($editavel->recorrente || $editavel->isParcela()) && !$editavel->assinatura_id)
+                <div class="col-12 mt-3">
+                    <div class="alert alert-info py-2">
+                        <i class="fa-solid fa-link me-1"></i>
+                        Esta é uma conta {{ $editavel->isParcela() ? 'parcelada' : 'fixa' }}: você decide se as alterações valem para todos os meses ou só para este.
+                    </div>
+                    <label class="form-label fw-bold">Aplicar alterações</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="propagar" id="prop_todos" value="todos" wire:model="propagar">
+                        <label class="form-check-label" for="prop_todos">Em todos os meses desta conta</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="propagar" id="prop_mes" value="mes" wire:model="propagar">
+                        <label class="form-check-label" for="prop_mes">Somente neste mês</label>
+                    </div>
+                    <small class="text-muted d-block">Data e valor continuam por mês. Para mudar o valor em vários meses, use o botão "Valor" na lista.</small>
+                </div>
+            @endif
         </div>
 
         <div class="mt-4 d-flex gap-2">
