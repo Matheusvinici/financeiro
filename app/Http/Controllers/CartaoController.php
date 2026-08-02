@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assinatura;
 use App\Models\Cartao;
+use App\Models\Lancamento;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -12,6 +14,8 @@ class CartaoController extends Controller
     {
         $user = auth()->user();
         $hoje = Carbon::now();
+
+        Assinatura::sincronizar($user);
 
         $mes = $request->input('mes');
         $mes = $mes === 'todos' ? 'todos' : (int) ($mes ?: $hoje->month);
@@ -44,6 +48,15 @@ class CartaoController extends Controller
 
         $totalGeral = $totais->sum('gasto_periodo');
 
+        $assinaturas = $user->assinaturas()->with(['cartao', 'categoria'])
+            ->orderByDesc('ativo')->orderBy('nome')->get();
+        $totalAssinaturas = (float) $assinaturas->where('ativo', true)->sum('valor');
+
+        $ajustes = $user->lancamentos()
+            ->with('cartao')
+            ->where('ajuste', true)
+            ->orderByDesc('data')->limit(15)->get();
+
         // Projeção de parcelas por cartão nos próximos 12 meses
         $inicio = $hoje->copy()->startOfMonth();
         $fim = $inicio->copy()->addMonths(11)->endOfMonth();
@@ -53,8 +66,8 @@ class CartaoController extends Controller
             ->whereNotNull('cartao_id')
             ->where('cartao_debito', false)
             ->whereBetween('data', [$inicio, $fim])
-            ->selectRaw('cartao_id, YEAR(data) as y, MONTH(data) as m, SUM(valor) as total')
-            ->groupBy('cartao_id', 'y', 'm')->get();
+            ->selectRaw("cartao_id, COALESCE(fatura_key, DATE_FORMAT(data, '%Y-%m')) as chave, SUM(valor) as total")
+            ->groupBy('cartao_id', 'chave')->get();
 
         $mesesProjecao = [];
         for ($i = 0; $i < 12; $i++) {
@@ -74,7 +87,7 @@ class CartaoController extends Controller
             }
         }
         foreach ($parcelasFuturas as $p) {
-            $projecao[$p->cartao_id][$p->y . '-' . $p->m] = (float) $p->total;
+            $projecao[$p->cartao_id][$p->chave] = (float) $p->total;
         }
 
         $mesesDisponiveis = $user->lancamentos()
@@ -87,7 +100,8 @@ class CartaoController extends Controller
             ->values();
 
         return view('cartoes.index', compact(
-            'totais', 'totalGeral', 'mes', 'ano', 'mesesProjecao', 'projecao', 'mesesDisponiveis'
+            'totais', 'totalGeral', 'mes', 'ano', 'mesesProjecao', 'projecao', 'mesesDisponiveis',
+            'assinaturas', 'totalAssinaturas', 'ajustes'
         ));
     }
 
@@ -125,6 +139,54 @@ class CartaoController extends Controller
         $cartao->update($data + ['ativo' => $request->boolean('ativo', true)]);
 
         return back()->with('success', 'Cartão atualizado.');
+    }
+
+    public function storeAjuste(Request $request)
+    {
+        $user = auth()->user();
+
+        $data = $this->validate($request, [
+            'cartao_id' => ['required', 'exists:cartoes,id'],
+            'mes' => ['required', 'integer', 'min:1', 'max:12'],
+            'ano' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'valor' => ['required', 'numeric', 'min:0.01'],
+            'operacao' => ['required', 'in:adicionar,reduzir'],
+            'motivo' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $cartao = $user->cartoes()->findOrFail($data['cartao_id']);
+
+        $faturaKey = sprintf('%04d-%02d', $data['ano'], $data['mes']);
+        $diaVenc = (int) $cartao->dia_vencimento ?: 1;
+        $dataVencimento = Carbon::create($data['ano'], $data['mes'], min($diaVenc, Carbon::create($data['ano'], $data['mes'], 1)->daysInMonth));
+
+        $user->lancamentos()->create([
+            'data' => $dataVencimento,
+            'descricao' => ($data['motivo'] ?? null) ? "Ajuste de fatura — {$data['motivo']}" : 'Ajuste de fatura',
+            'valor' => $data['operacao'] === 'reduzir' ? -$data['valor'] : $data['valor'],
+            'tipo' => 'despesa',
+            'forma_pagamento' => 'cartao',
+            'cartao_id' => $cartao->id,
+            'recorrente' => false,
+            'qtd_parcelas' => 1,
+            'parcela_atual' => 1,
+            'pago' => false,
+            'abate_saldo' => true,
+            'ajuste' => true,
+            'fatura_key' => $faturaKey,
+            'observacao' => $data['motivo'] ?? null,
+        ]);
+
+        return back()->with('success', 'Ajuste registrado na fatura de ' . $dataVencimento->translatedFormat('M/Y') . '.');
+    }
+
+    public function destroyAjuste(Lancamento $lancamento)
+    {
+        abort_unless($lancamento->user_id === auth()->id() && $lancamento->ajuste, 403);
+
+        $lancamento->delete();
+
+        return back()->with('success', 'Ajuste removido.');
     }
 
     public function destroy(Cartao $cartao)

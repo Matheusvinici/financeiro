@@ -50,6 +50,11 @@ class User extends Authenticatable
         return $this->hasMany(ContaPagar::class);
     }
 
+    public function assinaturas()
+    {
+        return $this->hasMany(Assinatura::class);
+    }
+
     public function compartilhamentosEnviados()
     {
         return $this->hasMany(Compartilhamento::class, 'dono_user_id');

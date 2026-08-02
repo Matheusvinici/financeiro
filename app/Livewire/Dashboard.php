@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Assinatura;
 use App\Models\ContaPagar;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
@@ -47,6 +48,8 @@ class Dashboard extends Component
     {
         $user = auth()->user();
         $hoje = Carbon::now();
+
+        Assinatura::sincronizar($user);
 
         $mes = $this->mes === 'todos' ? 'todos' : (int) ($this->mes ?: $hoje->month);
         $ano = (int) $this->ano;

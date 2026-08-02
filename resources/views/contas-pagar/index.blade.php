@@ -74,6 +74,12 @@
                                 <td>
                                     <strong>{{ $conta->descricao }}</strong>
                                     @if ($conta->observacao)<div class="small text-muted">{{ $conta->observacao }}</div>@endif
+                                    @if ($conta->quem_pagou || $conta->descricao_pagamento)
+                                        <div class="small text-success">
+                                            <i class="fa-solid fa-circle-check me-1"></i>
+                                            Pago{{ $conta->quem_pagou ? ' por ' . $conta->quem_pagou : '' }}{{ $conta->descricao_pagamento ? ' — ' . $conta->descricao_pagamento : '' }}
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>{{ $conta->categoria?->nome ?? '—' }}</td>
                                 <td>{{ $conta->data_vencimento?->translatedFormat('d/m/Y') ?? 'Sem data' }}</td>
@@ -91,16 +97,37 @@
                                 </td>
                                 <td class="text-end text-nowrap">
                                     @if ($conta->status !== 'pago')
-                                        <form method="POST" action="{{ route('contas-pagar.pagar', $conta) }}" class="d-inline">
-                                            @csrf
-                                            <button class="btn btn-sm btn-success" title="Registrar pagamento" onclick="event.preventDefault(); const v = prompt('Valor a pagar (R$):', '{{ number_format($conta->valor_restante, 2, '.', '') }}'); if(v){ const i = document.createElement('input'); i.type='hidden'; i.name='valor'; i.value=v.replace(',','.'); this.appendChild(i); this.submit(); }"><i class="fa-solid fa-money-bill-wave me-1"></i>Pagar</button>
-                                        </form>
+                                        <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#pagar{{ $conta->id }}" title="Registrar pagamento"><i class="fa-solid fa-money-bill-wave me-1"></i>Pagar</button>
                                     @endif
                                     <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#edit{{ $conta->id }}"><i class="fa-solid fa-pen me-1"></i>Editar</button>
                                     <form method="POST" action="{{ route('contas-pagar.destroy', $conta) }}" class="d-inline" onsubmit="return confirm('Excluir conta?')">
                                         @csrf @method('DELETE')
                                         <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
                                     </form>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="8" class="p-0">
+                                    <div class="collapse" id="pagar{{ $conta->id }}">
+                                        <form method="POST" action="{{ route('contas-pagar.pagar', $conta) }}" class="row g-2 p-3 bg-body-tertiary">
+                                            @csrf
+                                            <div class="col-md-2">
+                                                <label class="form-label small">Valor a pagar (R$) *</label>
+                                                <input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm" value="{{ $conta->valor_restante }}" required>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small">Descrição do pagamento</label>
+                                                <input type="text" name="descricao_pagamento" class="form-control form-control-sm" placeholder="Ex.: transferência Pix, depósito, dinheiro">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Quem pagou</label>
+                                                <input type="text" name="quem_pagou" class="form-control form-control-sm" placeholder="Ex.: Matheus, Mari">
+                                            </div>
+                                            <div class="col-md-2 d-flex align-items-end">
+                                                <button class="btn btn-sm btn-success w-100"><i class="fa-solid fa-money-bill-wave me-1"></i>Confirmar</button>
+                                            </div>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
@@ -119,6 +146,12 @@
                                             </div>
                                             <div class="col-md-3">
                                                 <input type="text" name="observacao" class="form-control form-control-sm" value="{{ $conta->observacao }}" placeholder="Obs.">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="text" name="descricao_pagamento" class="form-control form-control-sm" value="{{ $conta->descricao_pagamento }}" placeholder="Desc. pagamento">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="text" name="quem_pagou" class="form-control form-control-sm" value="{{ $conta->quem_pagou }}" placeholder="Quem pagou">
                                             </div>
                                             <div class="col-md-2">
                                                 <button class="btn btn-sm btn-primary w-100"><i class="fa-solid fa-check"></i></button>

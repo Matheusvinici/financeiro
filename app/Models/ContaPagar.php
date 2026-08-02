@@ -12,6 +12,7 @@ class ContaPagar extends Model
     protected $fillable = [
         'user_id', 'descricao', 'valor_total', 'valor_pago', 'status',
         'data_vencimento', 'categoria_id', 'observacao',
+        'descricao_pagamento', 'quem_pagou',
     ];
 
     protected $casts = [

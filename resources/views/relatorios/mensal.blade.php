@@ -75,6 +75,15 @@
                             {{ number_format($totaisAno['saldo'], 2, ',', '.') }}
                         </td>
                     </tr>
+                    @if ($despesasNaoAbate > 0)
+                        <tr>
+                            <th class="text-muted small">Despesas que não abatem do saldo</th>
+                            @foreach ($listaMeses as $m)
+                                <td class="text-end text-muted small">{{ $totaisMesNaoAbate[$m] ? number_format($totaisMesNaoAbate[$m], 2, ',', '.') : '' }}</td>
+                            @endforeach
+                            <td class="text-end fw-bold small text-muted">{{ number_format($despesasNaoAbate, 2, ',', '.') }}</td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>

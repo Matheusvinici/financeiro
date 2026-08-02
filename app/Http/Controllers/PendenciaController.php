@@ -56,7 +56,7 @@ class PendenciaController extends Controller
             ->filter(fn ($l) => $l->cartao !== null);
 
         $faturasCartao = $comprasCartao
-            ->groupBy(fn ($l) => $l->cartao_id . '|' . $l->cartao->faturaChave($l->data))
+            ->groupBy(fn ($l) => $l->cartao_id . '|' . ($l->fatura_key ?: $l->cartao->faturaChave($l->data)))
             ->map(function ($g, $key) {
                 [$cId, $chave] = explode('|', $key);
                 [$fAno, $fMes] = array_map('intval', explode('-', $chave));

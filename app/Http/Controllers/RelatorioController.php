@@ -22,9 +22,20 @@ class RelatorioController extends Controller
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
             ->with('categoria', 'subcategoria')->get();
         $despesas = $user->lancamentos()->where('tipo', 'despesa')
+            ->where('abate_saldo', true)
             ->whereYear('data', $ano)
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
             ->with('categoria', 'subcategoria')->get();
+        $despesasNaoAbateLista = $user->lancamentos()->where('tipo', 'despesa')
+            ->where('abate_saldo', false)
+            ->whereYear('data', $ano)
+            ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->get();
+        $despesasNaoAbate = $despesasNaoAbateLista->sum('valor');
+        $totaisMesNaoAbate = [];
+        foreach ($mesAtual ? [$mesAtual] : range(1, 12) as $m) {
+            $totaisMesNaoAbate[$m] = $despesasNaoAbateLista->filter(fn ($l) => $l->data->month === $m)->sum('valor');
+        }
 
         $agrupadas = $this->agruparPorCategoria($receitas, $despesas);
 
@@ -59,7 +70,8 @@ class RelatorioController extends Controller
 
         return view('relatorios.mensal', compact(
             'ano', 'mes', 'mesAtual', 'agrupadas', 'totaisMesReceitas', 'totaisMesDespesas',
-            'saldoMes', 'totaisAno', 'cartoes', 'gastosCartaoMes'
+            'saldoMes', 'totaisAno', 'cartoes', 'gastosCartaoMes', 'despesasNaoAbate',
+            'totaisMesNaoAbate'
         ));
     }
 
@@ -76,6 +88,7 @@ class RelatorioController extends Controller
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
             ->with('categoria', 'subcategoria')->get();
         $despesas = $user->lancamentos()->where('tipo', 'despesa')
+            ->where('abate_saldo', true)
             ->whereYear('data', $ano)
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
             ->with('categoria', 'subcategoria')->get();

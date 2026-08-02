@@ -13,6 +13,7 @@ class Lancamento extends Model
         'categoria_id', 'subcategoria_id', 'forma_pagamento',
         'cartao_id', 'recorrente', 'qtd_parcelas', 'parcela_atual',
         'origem_id', 'observacao', 'pago', 'abate_saldo', 'cartao_debito',
+        'assinatura_id', 'ajuste', 'fatura_key',
     ];
 
     protected $casts = [
@@ -24,11 +25,17 @@ class Lancamento extends Model
         'pago' => 'boolean',
         'abate_saldo' => 'boolean',
         'cartao_debito' => 'boolean',
+        'ajuste' => 'boolean',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function assinatura(): BelongsTo
+    {
+        return $this->belongsTo(Assinatura::class);
     }
 
     public function categoria(): BelongsTo

@@ -54,6 +54,11 @@
             <div class="stat-value">R$ {{ number_format($totalGeral, 2, ',', '.') }}</div>
             <div class="stat-label">Total gasto no período</div>
         </div>
+        <div class="stat-card green">
+            <div class="stat-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+            <div class="stat-value">R$ {{ number_format($totalAssinaturas, 2, ',', '.') }}</div>
+            <div class="stat-label">Assinaturas ativas/mês</div>
+        </div>
     </div>
 
     <div class="row g-3">
@@ -152,6 +157,209 @@
                 <div class="alert alert-info">Nenhum cartão cadastrado. Cadastre para vincular os gastos ao cartão usado.</div>
             </div>
         @endforelse
+    </div>
+
+    {{-- Assinaturas --}}
+    <div class="card shadow-sm mt-2">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="card-title mb-0"><i class="fa-solid fa-arrows-rotate me-2 text-success"></i>Assinaturas <small class="text-muted">(gastos recorrentes no cartão — entram na fatura na data de cobrança)</small></h5>
+            @if ($assinaturas->where('ativo', true)->count() > 0)
+                <span class="badge bg-success">R$ {{ number_format($totalAssinaturas, 2, ',', '.') }}/mês ativos</span>
+            @endif
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ route('assinaturas.store') }}" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-md-2">
+                    <label class="form-label small">Nome *</label>
+                    <input type="text" name="nome" class="form-control form-control-sm" placeholder="Ex.: Netflix" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Cartão *</label>
+                    <select name="cartao_id" class="form-select form-select-sm" required>
+                        @foreach (auth()->user()->cartoes()->where('ativo', true)->orderBy('nome')->get() as $c)
+                            <option value="{{ $c->id }}">{{ $c->nome }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Categoria *</label>
+                    <select name="categoria_id" class="form-select form-select-sm" required>
+                        @foreach (auth()->user()->categorias()->where('tipo', 'despesa')->orderBy('nome')->get() as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->nome }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small">Valor *</label>
+                    <input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm" placeholder="R$" required>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small">Dia</label>
+                    <input type="number" min="1" max="31" name="dia_cobranca" class="form-control form-control-sm" placeholder="15">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small">Início</label>
+                    <input type="month" name="data_inicio" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-1">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" name="ativo" value="1" id="assAtiva" checked>
+                        <label class="form-check-label small" for="assAtiva">Ativa</label>
+                    </div>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-sm btn-success w-100"><i class="fa-solid fa-plus me-1"></i>Salvar</button>
+                </div>
+            </form>
+            <hr>
+            @forelse ($assinaturas as $ass)
+                <div class="d-flex justify-content-between align-items-center py-1 {{ $ass->ativo ? '' : 'opacity-50' }}">
+                    <div>
+                        <strong>{{ $ass->nome }}</strong>
+                        <span class="text-muted small"> · {{ $ass->cartao?->nome }} · {{ $ass->categoria?->nome }} · R$ {{ number_format($ass->valor, 2, ',', '.') }} @if ($ass->dia_cobranca) · dia {{ $ass->dia_cobranca }} @endif</span>
+                        @if ($ass->observacao)<div class="small text-muted">{{ $ass->observacao }}</div>@endif
+                    </div>
+                    <div class="text-nowrap">
+                        <form method="POST" action="{{ route('assinaturas.update', $ass) }}" class="d-inline">
+                            @csrf @method('PUT')
+                            <input type="hidden" name="nome" value="{{ $ass->nome }}">
+                            <input type="hidden" name="cartao_id" value="{{ $ass->cartao_id }}">
+                            <input type="hidden" name="categoria_id" value="{{ $ass->categoria_id }}">
+                            <input type="hidden" name="valor" value="{{ $ass->valor }}">
+                            <input type="hidden" name="dia_cobranca" value="{{ $ass->dia_cobranca }}">
+                            <input type="hidden" name="data_inicio" value="{{ $ass->data_inicio?->format('Y-m') }}">
+                            <input type="hidden" name="ativo" value="{{ $ass->ativo ? 0 : 1 }}">
+                            <button class="btn btn-sm {{ $ass->ativo ? 'btn-outline-warning' : 'btn-outline-success' }}" title="{{ $ass->ativo ? 'Desativar (para de gerar cobranças futuras)' : 'Ativar' }}">
+                                <i class="fa-solid {{ $ass->ativo ? 'fa-pause' : 'fa-play' }}"></i> {{ $ass->ativo ? 'Desativar' : 'Ativar' }}
+                            </button>
+                        </form>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editAss{{ $ass->id }}"><i class="fa-solid fa-pen"></i></button>
+                        <form method="POST" action="{{ route('assinaturas.destroy', $ass) }}" class="d-inline" onsubmit="return confirm('Excluir assinatura {{ $ass->nome }} e seus lançamentos?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                <div class="collapse" id="editAss{{ $ass->id }}">
+                    <form method="POST" action="{{ route('assinaturas.update', $ass) }}" class="row g-2 p-2 bg-body-tertiary mb-2">
+                        @csrf @method('PUT')
+                        <div class="col-md-2"><input type="text" name="nome" class="form-control form-control-sm" value="{{ $ass->nome }}" required></div>
+                        <div class="col-md-2">
+                            <select name="cartao_id" class="form-select form-select-sm">
+                                @foreach (auth()->user()->cartoes()->orderBy('nome')->get() as $c)
+                                    <option value="{{ $c->id }}" @selected($ass->cartao_id === $c->id)>{{ $c->nome }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="categoria_id" class="form-select form-select-sm">
+                                @foreach (auth()->user()->categorias()->where('tipo', 'despesa')->orderBy('nome')->get() as $cat)
+                                    <option value="{{ $cat->id }}" @selected($ass->categoria_id === $cat->id)>{{ $cat->nome }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-1"><input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm" value="{{ $ass->valor }}" required></div>
+                        <div class="col-md-1"><input type="number" min="1" max="31" name="dia_cobranca" class="form-control form-control-sm" value="{{ $ass->dia_cobranca }}"></div>
+                        <div class="col-md-1"><input type="month" name="data_inicio" class="form-control form-control-sm" value="{{ $ass->data_inicio?->format('Y-m') }}"></div>
+                        <div class="col-md-1">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="ativo" value="1" id="assAtiva{{ $ass->id }}" @checked($ass->ativo)>
+                                <label class="form-check-label small" for="assAtiva{{ $ass->id }}">Ativa</label>
+                            </div>
+                        </div>
+                        <div class="col-md-1"><button class="btn btn-sm btn-primary w-100"><i class="fa-solid fa-check"></i></button></div>
+                    </form>
+                </div>
+            @empty
+                <div class="alert alert-info mb-0">Nenhuma assinatura cadastrada. Assinaturas geram um lançamento mensal no cartão escolhido.</div>
+            @endforelse
+        </div>
+    </div>
+
+    {{-- Ajustes de fatura --}}
+    <div class="card shadow-sm mt-2">
+        <div class="card-header">
+            <h5 class="card-title mb-0"><i class="fa-solid fa-sliders me-2 text-warning"></i>Ajustes de fatura <small class="text-muted">(esqueceu de lançar algo ou parcelou a fatura — o valor entra na fatura escolhida e atualiza os gráficos)</small></h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ route('cartoes.ajustes.store') }}" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-md-2">
+                    <label class="form-label small">Cartão *</label>
+                    <select name="cartao_id" class="form-select form-select-sm" required>
+                        @foreach (auth()->user()->cartoes()->where('ativo', true)->orderBy('nome')->get() as $c)
+                            <option value="{{ $c->id }}">{{ $c->nome }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Fatura</label>
+                    <div class="d-flex gap-1">
+                        <select name="mes" class="form-select form-select-sm">
+                            @foreach (range(1, 12) as $m)
+                                <option value="{{ $m }}" @selected($m === (int) now()->month)>{{ \Carbon\Carbon::create()->month($m)->translatedFormat('M') }}</option>
+                            @endforeach
+                        </select>
+                        <select name="ano" class="form-select form-select-sm">
+                            @foreach (range(now()->year, now()->year + 1) as $y)
+                                <option value="{{ $y }}" @selected($y === (int) now()->year)>{{ $y }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Operação</label>
+                    <select name="operacao" class="form-select form-select-sm">
+                        <option value="adicionar">Adicionar à fatura</option>
+                        <option value="reduzir">Reduzir da fatura</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Valor (R$) *</label>
+                    <input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Motivo</label>
+                    <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Ex.: compra esquecida, parcelamento" maxlength="150">
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-sm btn-warning w-100"><i class="fa-solid fa-check me-1"></i>Aplicar</button>
+                </div>
+            </form>
+            @if ($ajustes->isNotEmpty())
+                <hr>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Cartão</th>
+                                <th>Fatura</th>
+                                <th>Descrição</th>
+                                <th class="text-end">Valor</th>
+                                <th class="text-end">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($ajustes as $ajuste)
+                                <tr>
+                                    <td>{{ $ajuste->cartao?->nome }}</td>
+                                    <td>{{ \Carbon\Carbon::create()->month((int) substr($ajuste->fatura_key, 5, 2))->translatedFormat('M') . '/' . substr($ajuste->fatura_key, 0, 4) }}</td>
+                                    <td>{{ $ajuste->descricao }}</td>
+                                    <td class="text-end {{ $ajuste->valor >= 0 ? 'text-danger' : 'text-success' }}">{{ $ajuste->valor >= 0 ? '+' : '' }}R$ {{ number_format($ajuste->valor, 2, ',', '.') }}</td>
+                                    <td class="text-end">
+                                        <form method="POST" action="{{ route('cartoes.ajustes.destroy', $ajuste) }}" class="d-inline" onsubmit="return confirm('Remover ajuste?')">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
     </div>
 
     {{-- Projeção de parcelas --}}

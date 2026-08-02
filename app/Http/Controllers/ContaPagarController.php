@@ -48,7 +48,9 @@ class ContaPagarController extends Controller
             'valor_total' => $data['valor_total'],
             'data_vencimento' => $data['data_vencimento'] ?: null,
             'categoria_id' => $data['categoria_id'] ?: null,
-            'observacao' => $data['observacao'] ?: null,
+            'observacao' => $data['observacao'] ?? null,
+            'descricao_pagamento' => $data['descricao_pagamento'] ?? null,
+            'quem_pagou' => $data['quem_pagou'] ?? null,
         ]);
         $conta->refreshStatus();
 
@@ -62,6 +64,8 @@ class ContaPagarController extends Controller
         $valor = (float) $request->input('valor', $conta->valor_restante);
 
         $conta->valor_pago = round($conta->valor_pago + $valor, 2);
+        $conta->descricao_pagamento = $request->input('descricao_pagamento') ?: null;
+        $conta->quem_pagou = $request->input('quem_pagou') ?: null;
         $conta->refreshStatus();
         $conta->save();
 
@@ -84,6 +88,8 @@ class ContaPagarController extends Controller
             'data_vencimento' => ['nullable', 'date'],
             'categoria_id' => ['nullable', 'exists:categorias,id'],
             'observacao' => ['nullable', 'string', 'max:500'],
+            'descricao_pagamento' => ['nullable', 'string', 'max:150'],
+            'quem_pagou' => ['nullable', 'string', 'max:80'],
         ]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AssinaturaController;
 use App\Http\Controllers\CartaoController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\CompartilhamentoController;
@@ -23,6 +24,11 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/subcategorias/{subcategoria}', [CategoriaController::class, 'destroySubcategoria'])->name('subcategorias.destroy');
 
     Route::resource('cartoes', CartaoController::class)->except(['create', 'show', 'edit'])->parameters(['cartoes' => 'cartao']);
+    Route::post('/cartoes/assinaturas', [AssinaturaController::class, 'store'])->name('assinaturas.store');
+    Route::put('/cartoes/assinaturas/{assinatura}', [AssinaturaController::class, 'update'])->name('assinaturas.update');
+    Route::delete('/cartoes/assinaturas/{assinatura}', [AssinaturaController::class, 'destroy'])->name('assinaturas.destroy');
+    Route::post('/cartoes/ajustes', [CartaoController::class, 'storeAjuste'])->name('cartoes.ajustes.store');
+    Route::delete('/cartoes/ajustes/{lancamento}', [CartaoController::class, 'destroyAjuste'])->name('cartoes.ajustes.destroy');
 
     Route::get('/lancamentos/subcategorias', [LancamentoController::class, 'subcategorias'])->name('lancamentos.subcategorias');
     Route::get('/lancamentos/create', LancamentoForm::class)->name('lancamentos.create');
