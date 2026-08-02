@@ -4,24 +4,90 @@ namespace App\Http\Controllers;
 
 use App\Models\Cartao;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class CartaoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $cartoes = auth()->user()->cartoes()->withCount('lancamentos')->orderBy('nome')->get();
-        $totais = $cartoes->map(function ($cartao) {
-            $gastoMes = (float) $cartao->lancamentos()
-                ->where('tipo', 'despesa')->whereYear('data', now()->year)->whereMonth('data', now()->month)
-                ->sum('valor');
+        $user = auth()->user();
+        $hoje = Carbon::now();
+
+        $mes = $request->input('mes');
+        $mes = $mes === 'todos' ? 'todos' : (int) ($mes ?: $hoje->month);
+        $ano = (int) $request->input('ano', $hoje->year);
+
+        $periodo = $mes === 'todos' ? 'ano' : 'mes';
+        $mesAtual = $mes === 'todos' ? null : $mes;
+
+        $cartoes = $user->cartoes()->withCount('lancamentos')->orderBy('nome')->get();
+
+        $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo) {
+            $gastoPeriodo = (float) $cartao->lancamentos()
+                ->where('tipo', 'despesa')->quando($periodo, $ano, $mesAtual)->sum('valor');
+
+            $parcelasPeriodo = (float) $cartao->lancamentos()
+                ->where('tipo', 'despesa')->where('qtd_parcelas', '>', 1)
+                ->quando($periodo, $ano, $mesAtual)->sum('valor');
+
+            $avistaPeriodo = $gastoPeriodo - $parcelasPeriodo;
 
             return [
                 'cartao' => $cartao,
-                'gasto_mes' => $gastoMes,
+                'gasto_periodo' => $gastoPeriodo,
+                'parcelas_periodo' => $parcelasPeriodo,
+                'avista_periodo' => $avistaPeriodo,
+                'utilizacao_pct' => $cartao->limite > 0 ? round(($gastoPeriodo / $cartao->limite) * 100, 1) : 0,
             ];
         });
 
-        return view('cartoes.index', ['totais' => $totais]);
+        $totalGeral = $totais->sum('gasto_periodo');
+
+        // Projeção de parcelas por cartão nos próximos 12 meses
+        $inicio = $hoje->copy()->startOfMonth();
+        $fim = $inicio->copy()->addMonths(11)->endOfMonth();
+
+        $parcelasFuturas = $user->lancamentos()
+            ->where('tipo', 'despesa')
+            ->where('qtd_parcelas', '>', 1)
+            ->whereNotNull('cartao_id')
+            ->whereBetween('data', [$inicio, $fim])
+            ->selectRaw('cartao_id, YEAR(data) as y, MONTH(data) as m, SUM(valor) as total')
+            ->groupBy('cartao_id', 'y', 'm')->get();
+
+        $mesesProjecao = [];
+        for ($i = 0; $i < 12; $i++) {
+            $d = $inicio->copy()->addMonths($i);
+            $mesesProjecao[] = [
+                'ano' => $d->year,
+                'mes' => $d->month,
+                'rotulo' => $d->translatedFormat('M/y'),
+            ];
+        }
+
+        $projecao = [];
+        foreach ($cartoes as $cartao) {
+            $projecao[$cartao->id] = [];
+            foreach ($mesesProjecao as $p) {
+                $projecao[$cartao->id][$p['ano'] . '-' . $p['mes']] = 0;
+            }
+        }
+        foreach ($parcelasFuturas as $p) {
+            $projecao[$p->cartao_id][$p->y . '-' . $p->m] = (float) $p->total;
+        }
+
+        $mesesDisponiveis = $user->lancamentos()
+            ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')
+            ->distinct()->get()
+            ->map(fn ($m) => ['ano' => (int) $m->ano, 'mes' => (int) $m->mes])
+            ->push(['ano' => $hoje->year, 'mes' => $hoje->month])
+            ->unique(fn ($m) => $m['ano'] . '-' . $m['mes'])
+            ->sortByDesc(fn ($m) => $m['ano'] * 12 + $m['mes'])
+            ->values();
+
+        return view('cartoes.index', compact(
+            'totais', 'totalGeral', 'mes', 'ano', 'mesesProjecao', 'projecao', 'mesesDisponiveis'
+        ));
     }
 
     public function store(Request $request)

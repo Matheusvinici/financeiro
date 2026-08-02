@@ -12,6 +12,7 @@
         "laravel/fortify": "^1.26",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
+        "livewire/livewire": "^4.3",
         "phpoffice/phpspreadsheet": "^3.0",
         "spatie/laravel-permission": "^6.25"
     },

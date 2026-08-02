@@ -1,33 +1,28 @@
-@extends('layouts.app')
-
-@section('title', 'Dashboard')
-@section('page-title', 'Dashboard Financeiro')
-
-@section('content')
+<div>
     @php
         $rotuloPeriodo = $mes === 'todos'
             ? 'ano ' . $ano
             : \Carbon\Carbon::now()->month($mes)->translatedFormat('F/Y');
     @endphp
 
-    {{-- Seletor de período --}}
+    {{-- Seletor de período (atualiza sozinho) --}}
     <div class="card mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-end">
+            <div class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small">Mês</label>
-                    <select name="mes" class="form-select">
-                        <option value="todos" @selected($mes === 'todos')>Todos os meses do ano</option>
+                    <select wire:model.live="mes" class="form-select">
+                        <option value="todos">Todos os meses do ano</option>
                         @foreach (range(1, 12) as $m)
-                            <option value="{{ $m }}" @selected($mes === $m)>{{ \Carbon\Carbon::create()->month($m)->translatedFormat('F') }}</option>
+                            <option value="{{ $m }}">{{ \Carbon\Carbon::now()->month($m)->translatedFormat('F') }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small">Ano</label>
-                    <select name="ano" class="form-select">
+                    <select wire:model.live="ano" class="form-select">
                         @foreach ($mesesDisponiveis->pluck('ano')->unique()->sortDesc() as $y)
-                            <option value="{{ $y }}" @selected($ano == $y)>{{ $y }}</option>
+                            <option value="{{ $y }}">{{ $y }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -37,16 +32,15 @@
                         <option value="">— Ir direto para —</option>
                         @foreach ($mesesDisponiveis as $p)
                             <option value="{{ route('dashboard', ['mes' => $p['mes'], 'ano' => $p['ano']]) }}" @selected($mes === $p['mes'] && $ano === $p['ano'])>
-                                {{ \Carbon\Carbon::create()->month($p['mes'])->translatedFormat('F') . '/' . $p['ano'] }}
+                                {{ \Carbon\Carbon::now()->month($p['mes'])->translatedFormat('F') . '/' . $p['ano'] }}
                             </option>
                         @endforeach
                     </select>
                 </div>
                 <div class="col-md-3 d-flex gap-1">
-                    <button class="btn btn-primary flex-grow-1"><i class="fa-solid fa-magnifying-glass me-1"></i>Ver</button>
-                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary" title="Mês atual"><i class="fa-solid fa-rotate-left"></i></a>
+                    <button type="button" wire:click="resetPeriodo" class="btn btn-outline-secondary flex-grow-1" title="Mês atual"><i class="fa-solid fa-rotate-left me-1"></i>Mês atual</button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -71,7 +65,7 @@
             <div class="stat-value">R$ {{ number_format($saldoMes, 2, ',', '.') }}</div>
             <div class="stat-label">{{ $mes === 'todos' ? 'Saldo do ano' : 'Saldo do mês' }}</div>
             <div class="stat-sub">
-                {{ $saldoMesAnterior >= 0 ? '+' : '' }}R$ {{ number_format($saldoMesAnterior, 2, ',', '.') }} no mês passado
+                {{ $saldoMesAnterior >= 0 ? '+' : '' }}R$ {{ number_format($saldoMesAnterior, 2, ',', '.') }} no período anterior
             </div>
         </div>
 
@@ -215,7 +209,7 @@
                                 <td colspan="5">
                                     <div class="empty-state">
                                         <i class="fa-solid fa-folder-open"></i>
-                                        <p>Nenhum lançamento ainda. Importe sua planilha ou cadastre o primeiro!</p>
+                                        <p>Nenhum lançamento neste período.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -225,74 +219,63 @@
             </div>
         </div>
     </div>
-@endsection
 
-@push('scripts')
+    <script type="application/json" id="graficos-data">
+        @json($graficos)
+    </script>
+</div>
+
 <script>
-    const rotulos = @json($graficos['rotulos']);
-    const receitas = @json($graficos['receitas']);
-    const despesas = @json($graficos['despesas']);
-    const saldo = @json($graficos['saldo']);
-    const temaBody = document.body.getAttribute('data-bs-theme');
-    const corTexto = temaBody === 'dark' ? '#9ca3af' : '#6c7293';
+    window.mfCharts = {};
 
-    Chart.defaults.color = corTexto;
+    function initGraficos() {
+        Object.values(window.mfCharts).forEach(c => { try { c.destroy(); } catch (e) {} });
+        window.mfCharts = {};
 
-    new Chart(document.getElementById('chartEvolucao'), {
-        type: 'line',
-        data: {
-            labels: rotulos,
-            datasets: [
-                {
-                    label: 'Receitas',
-                    data: receitas,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16,185,129,.1)',
-                    fill: true,
-                    tension: .3
+        const el = document.getElementById('graficos-data');
+        if (!el) return;
+        const graficos = JSON.parse(el.textContent);
+
+        const temaBody = document.body.getAttribute('data-bs-theme');
+        const corTexto = temaBody === 'dark' ? '#9ca3af' : '#6c7293';
+        Chart.defaults.color = corTexto;
+
+        const canvasEvo = document.getElementById('chartEvolucao');
+        if (canvasEvo) {
+            window.mfCharts.evolucao = new Chart(canvasEvo, {
+                type: 'line',
+                data: {
+                    labels: graficos.rotulos,
+                    datasets: [
+                        { label: 'Receitas', data: graficos.receitas, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .3 },
+                        { label: 'Despesas', data: graficos.despesas, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', fill: true, tension: .3 },
+                        { label: 'Saldo', data: graficos.saldo, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.15)', fill: true, tension: .3 }
+                    ]
                 },
-                {
-                    label: 'Despesas',
-                    data: despesas,
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239,68,68,.1)',
-                    fill: true,
-                    tension: .3
-                },
-                {
-                    label: 'Saldo',
-                    data: saldo,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59,130,246,.15)',
-                    fill: true,
-                    tension: .3
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
         }
-    });
 
-    const donut = @json($graficos['donut']);
-    new Chart(document.getElementById('chartDonut'), {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(donut),
-            datasets: [{
-                data: Object.values(donut),
-                backgroundColor: ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#fd7e14', '#14b8a6'],
-                borderWidth: 2,
-                borderColor: temaBody === 'dark' ? '#1a1d29' : '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+        const canvasDonut = document.getElementById('chartDonut');
+        if (canvasDonut) {
+            window.mfCharts.donut = new Chart(canvasDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(graficos.donut),
+                    datasets: [{
+                        data: Object.values(graficos.donut),
+                        backgroundColor: ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#fd7e14', '#14b8a6'],
+                        borderWidth: 2,
+                        borderColor: temaBody === 'dark' ? '#1a1d29' : '#ffffff'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+            });
         }
+    }
+
+    document.addEventListener('livewire:init', () => {
+        initGraficos();
+        Livewire.on('graficos-atualizados', () => initGraficos());
     });
 </script>
-@endpush

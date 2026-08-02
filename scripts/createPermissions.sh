@@ -1,3 +1,3 @@
-php artisan permission:create-permission-routes
-php artisan db:seed --class=AdminAssignAllPermissions
+#!/bin/bash
+php artisan db:seed --class=PermissionSeeder
 bash clearCaches.sh

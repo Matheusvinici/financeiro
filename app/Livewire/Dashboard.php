@@ -1,22 +1,50 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Livewire;
 
 use App\Models\ContaPagar;
-use App\Models\Lancamento;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Livewire\Component;
 
-class DashboardController extends Controller
+class Dashboard extends Component
 {
-    public function index(Request $request)
+    public $mes;
+
+    public $ano;
+
+    public function mount(): void
+    {
+        $hoje = Carbon::now();
+
+        $this->mes = request()->query('mes', $hoje->month);
+        $this->ano = (int) request()->query('ano', $hoje->year);
+    }
+
+    public function updatedMes(): void
+    {
+        $this->dispatch('graficos-atualizados');
+    }
+
+    public function updatedAno(): void
+    {
+        $this->dispatch('graficos-atualizados');
+    }
+
+    public function resetPeriodo(): void
+    {
+        $hoje = Carbon::now();
+        $this->mes = $hoje->month;
+        $this->ano = $hoje->year;
+        $this->dispatch('graficos-atualizados');
+    }
+
+    public function render()
     {
         $user = auth()->user();
         $hoje = Carbon::now();
 
-        $mes = $request->input('mes');
-        $mes = $mes === 'todos' ? 'todos' : (int) ($mes ?: $hoje->month);
-        $ano = (int) $request->input('ano', $hoje->year);
+        $mes = $this->mes === 'todos' ? 'todos' : (int) ($this->mes ?: $hoje->month);
+        $ano = (int) $this->ano;
 
         $periodo = $mes === 'todos' ? 'ano' : 'mes';
         $mesAtual = $mes === 'todos' ? null : $mes;
@@ -48,7 +76,6 @@ class DashboardController extends Controller
             ->where('status', '!=', 'pago')->get();
         $totalContasAberto = $contasAberto->sum('valor_restante');
 
-        // ----- Meses disponíveis (com dados ou atuais) -----
         $mesesDisponiveis = $user->lancamentos()
             ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')
             ->distinct()->get()
@@ -58,7 +85,6 @@ class DashboardController extends Controller
             ->sortByDesc(fn ($m) => $m['ano'] * 12 + $m['mes'])
             ->values();
 
-        // ----- Alertas -----
         $alertas = [];
 
         if ($saldoMes < 0) {
@@ -130,18 +156,15 @@ class DashboardController extends Controller
             ];
         }
 
-        // ----- Simulador de nova parcela -----
         $simulador = $this->simuladorParcela($user, $ano, $mesAtual);
 
-        // ----- Dados dos gráficos -----
         $graficos = $this->dadosGraficos($user, $ano, $mesAtual);
 
-        // ----- Últimos lançamentos do período -----
         $ultimos = $user->lancamentos()->with(['categoria', 'subcategoria', 'cartao'])
             ->quando($periodo, $ano, $mesAtual)
             ->orderByDesc('data')->limit(8)->get();
 
-        return view('dashboard.index', compact(
+        return view('livewire.dashboard', compact(
             'user', 'ano', 'mes', 'hoje', 'mesAtual', 'periodo', 'mesesDisponiveis',
             'receitasMes', 'despesasMes', 'saldoMes',
             'receitasMesAnterior', 'despesasMesAnterior', 'saldoMesAnterior',
@@ -262,7 +285,6 @@ class DashboardController extends Controller
             $rotulos[] = $d->translatedFormat('M/y');
         }
 
-        // Despesas por categoria no período selecionado
         $donut = $user->lancamentos()->where('tipo', 'despesa')
             ->quando($mes === null ? 'ano' : 'mes', $ano, $mes)
             ->with('categoria')
