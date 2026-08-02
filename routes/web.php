@@ -8,6 +8,7 @@ use App\Http\Controllers\ContaPagarController;
 use App\Http\Controllers\LancamentoController;
 use App\Http\Controllers\RelatorioController;
 use App\Livewire\Dashboard;
+use App\Livewire\LancamentoForm;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect('/dashboard'));
@@ -20,10 +21,15 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/subcategorias/{subcategoria}', [CategoriaController::class, 'updateSubcategoria'])->name('subcategorias.update');
     Route::delete('/subcategorias/{subcategoria}', [CategoriaController::class, 'destroySubcategoria'])->name('subcategorias.destroy');
 
-    Route::resource('cartoes', CartaoController::class)->except(['create', 'show', 'edit']);
+    Route::resource('cartoes', CartaoController::class)->except(['create', 'show', 'edit'])->parameters(['cartoes' => 'cartao']);
 
     Route::get('/lancamentos/subcategorias', [LancamentoController::class, 'subcategorias'])->name('lancamentos.subcategorias');
-    Route::resource('lancamentos', LancamentoController::class)->except(['show']);
+    Route::get('/lancamentos/create', LancamentoForm::class)->name('lancamentos.create');
+    Route::post('/lancamentos', [LancamentoController::class, 'store'])->name('lancamentos.store');
+    Route::get('/lancamentos/{lancamento}/edit', LancamentoForm::class)->name('lancamentos.edit');
+    Route::put('/lancamentos/{lancamento}', [LancamentoController::class, 'update'])->name('lancamentos.update');
+    Route::delete('/lancamentos/{lancamento}', [LancamentoController::class, 'destroy'])->name('lancamentos.destroy');
+    Route::get('/lancamentos', [LancamentoController::class, 'index'])->name('lancamentos.index');
 
     Route::get('/relatorios/mensal', [RelatorioController::class, 'mensal'])->name('relatorios.mensal');
     Route::get('/relatorios/pdf', [RelatorioController::class, 'exportarPdf'])->name('relatorios.pdf');

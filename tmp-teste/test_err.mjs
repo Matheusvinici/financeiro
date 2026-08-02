@@ -1,0 +1,15 @@
+import puppeteer from 'puppeteer-core';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+page.on('pageerror', e => console.log('PAGEERROR:', e.stack.split('\n').slice(0,4).join('\n')));
+await page.goto('http://127.0.0.1:8000/login', { waitUntil: 'networkidle0' });
+await page.type('input[name="email"]', 'matheus2vandrade@gmail.com');
+await page.type('input[name="password"]', 'Carpediem1996#');
+await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type="submit"]')]);
+await page.goto('http://127.0.0.1:8000/lancamentos/create', { waitUntil: 'networkidle0' });
+await sleep(800);
+await page.click('.tipo-receita');
+await sleep(1200);
+console.log('--- fim ---');
+await browser.close();
