@@ -125,6 +125,70 @@ class LancamentoController extends Controller
         return back()->with('success', 'Lançamento(s) removido(s).');
     }
 
+    public function alterarValor(Request $request, Lancamento $lancamento)
+    {
+        abort_unless($lancamento->user_id === auth()->id(), 403);
+        abort_if($lancamento->assinatura_id, 403, 'Use a edição da assinatura.');
+
+        $data = $this->validate($request, [
+            'novo_valor' => ['required', 'numeric', 'min:0.01'],
+            'mes_inicio' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $inicio = Carbon::createFromFormat('Y-m', $data['mes_inicio'])->startOfMonth();
+        $atualizados = 0;
+
+        foreach ($this->seriePara($lancamento) as $l) {
+            if ($l->data->gte($inicio)) {
+                $l->update(['valor' => $data['novo_valor']]);
+                $atualizados++;
+            }
+        }
+
+        return back()->with('success', "Valor atualizado em {$atualizados} lançamento(s) a partir de " .
+            $inicio->translatedFormat('m/Y') . '.');
+    }
+
+    public function pausar(Lancamento $lancamento)
+    {
+        abort_unless($lancamento->user_id === auth()->id(), 403);
+        abort_if($lancamento->assinatura_id, 403, 'Use a opção da assinatura.');
+
+        $serie = $lancamento->isParcela() ? $this->lancamentosSerie($lancamento) : $this->serieFixa($lancamento);
+
+        $removidos = $serie
+            ->filter(fn ($l) => $l->data->gt(now()->endOfMonth()))
+            ->each->delete()
+            ->count();
+
+        return back()->with('success', "Pausado: {$removidos} lançamento(s) futuro(s) removido(s). O histórico foi preservado.");
+    }
+
+    private function seriePara(Lancamento $lancamento)
+    {
+        if ($lancamento->isParcela()) {
+            return $this->lancamentosSerie($lancamento);
+        }
+
+        if ($lancamento->recorrente) {
+            return $this->serieFixa($lancamento);
+        }
+
+        return collect([$lancamento]);
+    }
+
+    private function serieFixa(Lancamento $lancamento)
+    {
+        return Lancamento::where('user_id', $lancamento->user_id)
+            ->where('descricao', $lancamento->descricao)
+            ->where('tipo', $lancamento->tipo)
+            ->where('categoria_id', $lancamento->categoria_id)
+            ->whereNull('assinatura_id')
+            ->where('recorrente', true)
+            ->orderBy('data')
+            ->get();
+    }
+
     private function lancamentosSerie(Lancamento $lancamento)
     {
         if ($lancamento->origem_id) {

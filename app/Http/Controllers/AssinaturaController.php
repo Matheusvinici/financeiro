@@ -49,6 +49,20 @@ class AssinaturaController extends Controller
         return back()->with('success', 'Assinatura atualizada.');
     }
 
+    public function alterarValor(Request $request, Assinatura $assinatura)
+    {
+        abort_unless($assinatura->user_id === auth()->id(), 403);
+
+        $data = $this->validate($request, [
+            'novo_valor' => ['required', 'numeric', 'min:0.01'],
+        ]);
+
+        $assinatura->update(['valor' => $data['novo_valor']]);
+        $assinatura->sincronizarLancamentos();
+
+        return back()->with('success', 'Valor da assinatura atualizado. Lançamentos futuros ajustados.');
+    }
+
     public function toggle(Assinatura $assinatura)
     {
         abort_unless($assinatura->user_id === auth()->id(), 403);

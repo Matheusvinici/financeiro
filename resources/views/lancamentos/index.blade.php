@@ -125,6 +125,27 @@
                                                 <button class="btn btn-sm btn-outline-success" title="Ativar assinatura"><i class="fa-solid fa-play me-1"></i>Ativar</button>
                                             @endif
                                         </form>
+                                        <button class="btn btn-sm btn-outline-primary" title="Alterar valor da assinatura"
+                                            data-bs-toggle="modal" data-bs-target="#modalValor"
+                                            data-url="{{ route('assinaturas.valor', $assinatura) }}"
+                                            data-nome="{{ $assinatura->nome }}"
+                                            data-valor="{{ $assinatura->valor }}"
+                                            data-sem-mes="1"><i class="fa-solid fa-circle-dollar me-1"></i>Valor</button>
+                                    @elseif ($l->isParcela() || $l->recorrente)
+                                        <button class="btn btn-sm btn-outline-primary" title="Alterar valor (preserva os anteriores)"
+                                            data-bs-toggle="modal" data-bs-target="#modalValor"
+                                            data-url="{{ route('lancamentos.alterarValor', $l) }}"
+                                            data-nome="{{ $l->descricao }}"
+                                            data-valor="{{ $l->valor }}"><i class="fa-solid fa-circle-dollar me-1"></i>Valor</button>
+                                        <form method="POST" action="{{ route('lancamentos.pausar', $l) }}" class="d-inline" onsubmit="return confirm('{{ $l->isParcela() ? 'Pausar estas parcelas' : 'Desativar esta conta fixa' }}? Os lançamentos futuros serão removidos e o histórico preservado.')">
+                                            @csrf
+                                            <button class="btn btn-sm btn-outline-secondary" title="{{ $l->isParcela() ? 'Pausar parcelas futuras' : 'Desativar conta fixa' }}"><i class="fa-solid fa-pause me-1"></i>{{ $l->isParcela() ? 'Pausar' : 'Desativar' }}</button>
+                                        </form>
+                                        <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Editar</a>
+                                        <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento{{ $l->isParcela() ? ' e toda a série de parcelas' : '' }}?')">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash me-1"></i>Excluir</button>
+                                        </form>
                                     @else
                                         <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Editar</a>
                                         <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento{{ $l->isParcela() ? ' e toda a série de parcelas' : '' }}?')">
@@ -152,4 +173,51 @@
             @endif
         </div>
     </div>
+
+    <div class="modal fade" id="modalValor" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" id="formValor">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalValorTitulo">Alterar valor</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Novo valor (R$)</label>
+                            <input type="number" step="0.01" min="0.01" name="novo_valor" id="modalValorValor" class="form-control" required>
+                        </div>
+                        <div class="mb-3" id="modalValorMesWrap">
+                            <label class="form-label">A partir de</label>
+                            <input type="month" name="mes_inicio" id="modalValorMes" class="form-control" value="{{ now()->format('Y-m') }}">
+                            <div class="form-text">Os lançamentos anteriores a esta data são preservados.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+        <script>
+            document.querySelectorAll('[data-bs-target="#modalValor"]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const f = document.getElementById('formValor');
+                    f.action = btn.dataset.url;
+                    document.getElementById('modalValorTitulo').textContent = 'Alterar valor — ' + btn.dataset.nome;
+                    document.getElementById('modalValorValor').value = btn.dataset.valor;
+                    const wrap = document.getElementById('modalValorMesWrap');
+                    wrap.style.display = btn.dataset.semMes ? 'none' : '';
+                    if (!btn.dataset.semMes) {
+                        document.getElementById('modalValorMes').value = '{{ now()->format('Y-m') }}';
+                    }
+                });
+            });
+        </script>
+    @endpush
 @endsection

@@ -45,6 +45,9 @@ class Assinatura extends Model
 
         if ($this->ativo) {
             $this->lancamentos()->where('data', '>', $fim)->delete();
+            $this->lancamentos()->where('data', '>', $agora)
+                ->where('valor', '!=', $this->valor)
+                ->update(['valor' => $this->valor]);
         } else {
             $this->lancamentos()->where('data', '>', $agora->copy()->endOfMonth())->delete();
         }

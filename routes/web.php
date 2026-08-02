@@ -28,6 +28,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/cartoes/assinaturas/{assinatura}', [AssinaturaController::class, 'update'])->name('assinaturas.update');
     Route::delete('/cartoes/assinaturas/{assinatura}', [AssinaturaController::class, 'destroy'])->name('assinaturas.destroy');
     Route::post('/assinaturas/{assinatura}/toggle', [AssinaturaController::class, 'toggle'])->name('assinaturas.toggle');
+    Route::post('/assinaturas/{assinatura}/valor', [AssinaturaController::class, 'alterarValor'])->name('assinaturas.valor');
+    Route::post('/lancamentos/{lancamento}/alterar-valor', [LancamentoController::class, 'alterarValor'])->name('lancamentos.alterarValor');
+    Route::post('/lancamentos/{lancamento}/pausar', [LancamentoController::class, 'pausar'])->name('lancamentos.pausar');
     Route::post('/cartoes/ajustes', [CartaoController::class, 'storeAjuste'])->name('cartoes.ajustes.store');
     Route::delete('/cartoes/ajustes/{lancamento}', [CartaoController::class, 'destroyAjuste'])->name('cartoes.ajustes.destroy');
 
