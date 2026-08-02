@@ -48,14 +48,18 @@
     <div class="stats-grid">
         <div class="stat-card green">
             <div class="stat-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
-            <div class="stat-value">R$ {{ number_format($receitasMes, 2, ',', '.') }}</div>
+            <div class="stat-value">
+                <a href="#" class="stat-link" data-bs-toggle="modal" data-bs-target="#modalReceitas" title="Ver quais receitas compõem este total">R$ {{ number_format($receitasMes, 2, ',', '.') }}</a>
+            </div>
             <div class="stat-label">Receitas de {{ $rotuloPeriodo }}</div>
             <div class="stat-sub"><a href="{{ route('lancamentos.index', ['tipo' => 'receita']) }}">Ver lançamentos <i class="fa-solid fa-arrow-right ms-1"></i></a></div>
         </div>
 
         <div class="stat-card red">
             <div class="stat-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
-            <div class="stat-value">R$ {{ number_format($despesasMes, 2, ',', '.') }}</div>
+            <div class="stat-value">
+                <a href="#" class="stat-link" data-bs-toggle="modal" data-bs-target="#modalDespesas" title="Ver quais despesas compõem este total">R$ {{ number_format($despesasMes, 2, ',', '.') }}</a>
+            </div>
             <div class="stat-label">Despesas de {{ $rotuloPeriodo }}</div>
             @if ($assinaturasPrevistas > 0)
                 <div class="stat-sub">Inclui R$ {{ number_format($assinaturasPrevistas, 2, ',', '.') }} em assinaturas previstas</div>
@@ -75,7 +79,9 @@
 
         <div class="stat-card yellow">
             <div class="stat-icon"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-            <div class="stat-value">R$ {{ number_format($totalContasAberto, 2, ',', '.') }}</div>
+            <div class="stat-value">
+                <a href="#" class="stat-link" data-bs-toggle="modal" data-bs-target="#modalPendencias" title="Ver quais pendências compõem este total">R$ {{ number_format($totalContasAberto, 2, ',', '.') }}</a>
+            </div>
             <div class="stat-label">Contas a pagar em aberto</div>
             <div class="stat-sub"><a href="{{ route('contas-pagar.index') }}">Gerenciar <i class="fa-solid fa-arrow-right ms-1"></i></a></div>
         </div>
@@ -227,6 +233,136 @@
     <script type="application/json" id="graficos-data">
         @json($graficos)
     </script>
+    <div class="modal fade" id="modalReceitas" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-arrow-trend-up text-success me-2"></i>Receitas de {{ $rotuloPeriodo }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th class="text-end">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($receitasLista as $l)
+                                <tr>
+                                    <td class="text-nowrap">{{ $l->data->translatedFormat('d/m/Y') }}</td>
+                                    <td>{{ $l->descricao }}</td>
+                                    <td>{{ $l->categoria?->nome ?? '—' }}</td>
+                                    <td class="text-end text-success">+ R$ {{ number_format($l->valor, 2, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma receita neste período.</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <th colspan="3">Total de receitas</th>
+                                <th class="text-end">R$ {{ number_format($receitasMes, 2, ',', '.') }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalDespesas" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-arrow-trend-down text-danger me-2"></i>Despesas de {{ $rotuloPeriodo }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th class="text-end">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($despesasLista as $l)
+                                <tr>
+                                    <td class="text-nowrap">{{ $l->data->translatedFormat('d/m/Y') }}</td>
+                                    <td>{{ $l->descricao }}</td>
+                                    <td>{{ $l->categoria?->nome ?? '—' }}</td>
+                                    <td class="text-end text-danger">- R$ {{ number_format($l->valor, 2, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma despesa neste período.</td></tr>
+                            @endforelse
+                            @if ($assinaturasPrevistas > 0)
+                                <tr>
+                                    <td class="text-nowrap">{{ $hoje->translatedFormat('d/m/Y') }}</td>
+                                    <td>Assinaturas previstas (ainda sem lançamento no mês)</td>
+                                    <td>—</td>
+                                    <td class="text-end text-danger">- R$ {{ number_format($assinaturasPrevistas, 2, ',', '.') }}</td>
+                                </tr>
+                            @endif
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <th colspan="3">Total de despesas</th>
+                                <th class="text-end">R$ {{ number_format($despesasMes, 2, ',', '.') }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalPendencias" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-hand-holding-dollar text-warning me-2"></i>Pendências em aberto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Vencimento</th>
+                                <th>Descrição</th>
+                                <th>Status</th>
+                                <th class="text-end">Valor restante</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($contasAberto as $c)
+                                <tr>
+                                    <td class="text-nowrap">{{ $c->data_vencimento?->translatedFormat('d/m/Y') ?? '—' }}</td>
+                                    <td>{{ $c->descricao }}</td>
+                                    <td><span class="badge {{ $c->status === 'parcial' ? 'bg-warning text-dark' : 'bg-danger' }}">{{ $c->status_label }}</span></td>
+                                    <td class="text-end text-danger">R$ {{ number_format($c->valor_restante, 2, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma pendência em aberto.</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <th colspan="3">Total pendente</th>
+                                <th class="text-end">R$ {{ number_format($totalContasAberto, 2, ',', '.') }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>

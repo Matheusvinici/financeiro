@@ -101,6 +101,16 @@ class Dashboard extends Component
             ->where('status', '!=', 'pago')->get();
         $totalContasAberto = $contasAberto->sum('valor_restante');
 
+        $receitasLista = $user->lancamentos()->with('categoria')
+            ->where('tipo', 'receita')->quando($periodo, $ano, $mesAtual)
+            ->orderByDesc('data')->orderByDesc('id')
+            ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
+
+        $despesasLista = $user->lancamentos()->with('categoria')
+            ->where('tipo', 'despesa')->where('abate_saldo', true)->quando($periodo, $ano, $mesAtual)
+            ->orderByDesc('data')->orderByDesc('id')
+            ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
+
         $mesesDisponiveis = $user->lancamentos()
             ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')
             ->distinct()->get()
@@ -193,7 +203,9 @@ class Dashboard extends Component
             'user', 'ano', 'mes', 'hoje', 'mesAtual', 'periodo', 'mesesDisponiveis',
             'receitasMes', 'despesasMes', 'saldoMes',
             'receitasMesAnterior', 'despesasMesAnterior', 'saldoMesAnterior',
-            'saldoAno', 'totalContasAberto', 'alertas', 'simulador', 'graficos', 'ultimos',
+            'saldoAno', 'totalContasAberto', 'contasAberto',
+            'receitasLista', 'despesasLista',
+            'alertas', 'simulador', 'graficos', 'ultimos',
             'assinaturasPrevistas'
         ));
     }
