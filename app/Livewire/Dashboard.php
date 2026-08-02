@@ -4,8 +4,12 @@ namespace App\Livewire;
 
 use App\Models\ContaPagar;
 use Illuminate\Support\Carbon;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
+#[Layout('layouts.app')]
+#[Title('Dashboard')]
 class Dashboard extends Component
 {
     public $mes;
@@ -16,7 +20,8 @@ class Dashboard extends Component
     {
         $hoje = Carbon::now();
 
-        $this->mes = request()->query('mes', $hoje->month);
+        $mesQuery = request()->query('mes', $hoje->month);
+        $this->mes = $mesQuery === 'todos' ? 'todos' : (int) $mesQuery;
         $this->ano = (int) request()->query('ano', $hoje->year);
     }
 

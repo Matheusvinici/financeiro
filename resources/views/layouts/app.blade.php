@@ -131,6 +131,7 @@
             @endif
 
             @yield('content')
+            @isset($slot){{ $slot }}@endisset
         </div>
 
         <footer class="footer">
@@ -139,6 +140,7 @@
     </div>
 
     <script src="{{ asset('js/chart.umd.min.js') }}"></script>
+    @livewireScripts
     @stack('scripts')
 
     <script>

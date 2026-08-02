@@ -5,15 +5,15 @@ use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\CompartilhamentoController;
 use App\Http\Controllers\ConfiguracaoController;
 use App\Http\Controllers\ContaPagarController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LancamentoController;
 use App\Http\Controllers\RelatorioController;
+use App\Livewire\Dashboard;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect('/dashboard'));
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', Dashboard::class)->name('dashboard');
 
     Route::resource('categorias', CategoriaController::class)->except(['create', 'show', 'edit']);
     Route::post('/categorias/{categoria}/subcategorias', [CategoriaController::class, 'storeSubcategoria'])->name('categorias.subcategorias.store');

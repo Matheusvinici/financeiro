@@ -18,7 +18,9 @@ git push -u origin $current_branch
 
 if [[ $current_branch == "main" ]]; then
     echo "🚀 Enviado para o GitHub! Iniciando deploy no servidor..."
-    ssh -p 65002 u933133168@212.85.9.2 "cd domains/myfinancas.shop/public_html && mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views storage/logs && chmod -R 775 bootstrap/cache storage && git pull origin $current_branch && composer install --no-dev --optimize-autoloader && (command -v npm >/dev/null && npm ci --no-audit --no-fund && npm run build) && php artisan migrate --force && php artisan db:seed --class=DatabaseSeeder --force && php artisan config:cache"
+    ssh -p 65002 u933133168@212.85.9.2 "cd domains/myfinancas.shop/public_html && mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views storage/logs && chmod -R 775 bootstrap/cache storage && git pull origin $current_branch && composer install --no-dev --optimize-autoloader && php artisan migrate --force && php artisan db:seed --class=DatabaseSeeder --force && php artisan config:cache"
+    echo "⬆️ Enviando build do frontend (servidor não possui node)..."
+    scp -P 65002 -r public/build/. u933133168@212.85.9.2:domains/myfinancas.shop/public_html/public/build/
 else
     echo "Você está em uma branch de desenvolvimento, não será feito o deploy no servidor."
 fi
