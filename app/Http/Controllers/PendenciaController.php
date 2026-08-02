@@ -23,7 +23,7 @@ class PendenciaController extends Controller
         $query = $user->lancamentos()
             ->with(['categoria', 'subcategoria', 'cartao'])
             ->where('tipo', 'despesa')
-            ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao'));
+            ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao')->orWhere('cartao_debito', true));
 
         if ($mesAtual) {
             $query->noMes($ano, $mesAtual);
@@ -39,20 +39,78 @@ class PendenciaController extends Controller
             ->with(['categoria'])
             ->where('tipo', 'despesa')
             ->where('pago', true)
-            ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao'))
+            ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao')->orWhere('cartao_debito', true))
             ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
             ->orderByDesc('data')
             ->limit(50)
             ->get();
 
-        $totalPendente = $pendencias->sum('valor');
+        $faturasCartao = $user->lancamentos()
+            ->with('cartao')
+            ->where('tipo', 'despesa')
+            ->where('forma_pagamento', 'cartao')
+            ->where('cartao_debito', false)
+            ->whereNotNull('cartao_id')
+            ->get()
+            ->filter(fn ($l) => $l->cartao !== null)
+            ->groupBy(fn ($l) => $l->cartao->faturaChave($l->data))
+            ->map(function ($g) use ($mesAtual, $ano) {
+                [$fAno, $fMes] = array_map('intval', explode('-', $g->first()->cartao->faturaChave($g->first()->data)));
+
+                return [
+                    'cartao' => $g->first()->cartao,
+                    'fatura_ano' => $fAno,
+                    'fatura_mes' => $fMes,
+                    'total' => round($g->sum('valor'), 2),
+                    'pago' => $mesAtual !== null && $fMes === $mesAtual && $fAno === $ano
+                        && $g->first()->cartao->faturaPaga($fMes, $fAno),
+                    'qtd' => $g->count(),
+                ];
+            })
+            ->values();
+
+        $faturaPendentes = $mesAtual === null
+            ? collect()
+            : $faturasCartao->filter(fn ($f) => !$f['pago'])
+                ->map(function ($f) {
+                    $c = $f['cartao'];
+                    $dia = (int) ($c->dia_vencimento ?: 1);
+                    $diasNoMes = Carbon::create($f['fatura_ano'], $f['fatura_mes'], 1)->daysInMonth;
+
+                    return (object) [
+                        'is_fatura' => true,
+                        'fatura_cartao' => $c,
+                        'fatura_total' => $f['total'],
+                        'fatura_qtd' => $f['qtd'],
+                        'data' => Carbon::create($f['fatura_ano'], $f['fatura_mes'], min($dia, $diasNoMes)),
+                    ];
+                });
+
+        $pendentes = $pendencias->concat($faturaPendentes)
+            ->sortBy(fn ($i) => $i->data ? $i->data->toDateString() : '9999-12-31')
+            ->values();
+
+        $totalPendente = $pendencias->sum('valor') + $faturaPendentes->sum('fatura_total');
         $totalNaoAbate = $pendencias->where('abate_saldo', false)->sum('valor');
-        $totalUrgente = $pendencias->filter(fn ($l) => $l->data && $l->data->copy()->startOfDay()->lte($hoje->copy()->addDays(3)))->sum('valor');
+        $totalUrgente = $pendencias->filter(fn ($l) => $l->data && $l->data->copy()->startOfDay()->lte($hoje->copy()->addDays(3)))->sum('valor')
+            + $faturaPendentes->filter(fn ($f) => $f->data->copy()->startOfDay()->lte($hoje->copy()->addDays(3)))->sum('fatura_total');
+
+        $totalPago = (float) $user->lancamentos()
+            ->where('tipo', 'despesa')
+            ->where('pago', true)
+            ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao')->orWhere('cartao_debito', true))
+            ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
+            ->sum('valor');
+
+        if ($mesAtual !== null) {
+            $totalPago += $faturasCartao->where('pago', true)->sum('total');
+        }
 
         $faturasCartao = $user->lancamentos()
             ->with('cartao')
             ->where('tipo', 'despesa')
             ->where('forma_pagamento', 'cartao')
+            ->where('cartao_debito', false)
             ->whereNotNull('cartao_id')
             ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
             ->get()
@@ -75,8 +133,8 @@ class PendenciaController extends Controller
             ->values();
 
         return view('pendencias.index', compact(
-            'pendencias', 'pagas', 'faturasCartao', 'mes', 'ano', 'mesAtual', 'hoje',
-            'totalPendente', 'totalNaoAbate', 'totalUrgente', 'mesesDisponiveis'
+            'pendencias', 'pagas', 'faturasCartao', 'pendentes', 'mes', 'ano', 'mesAtual', 'hoje',
+            'totalPendente', 'totalNaoAbate', 'totalUrgente', 'totalPago', 'mesesDisponiveis'
         ));
     }
 

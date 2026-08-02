@@ -123,6 +123,15 @@ class LancamentoForm extends Component
         $this->subcategoria_id = null;
     }
 
+    public function updatedRepeticao(): void
+    {
+        if ($this->tipo === 'despesa'
+            && in_array($this->repeticao, ['todo_mes', 'periodo'], true)
+            && $this->forma_pagamento !== 'cartao') {
+            $this->pago = false;
+        }
+    }
+
     public function updatedFormaPagamento(): void
     {
         if ($this->forma_pagamento === 'cartao') {
@@ -225,6 +234,7 @@ class LancamentoForm extends Component
                 'observacao' => $this->observacao ?: null,
                 'pago' => $this->pago,
                 'abate_saldo' => $this->abate_saldo,
+                'cartao_debito' => $this->cartao_debito,
             ]);
 
             session()->flash('success', 'Lançamento atualizado.');
@@ -249,6 +259,7 @@ class LancamentoForm extends Component
                 'observacao' => $this->observacao ?: null,
                 'pago' => $this->pago,
                 'abate_saldo' => $this->abate_saldo,
+                'cartao_debito' => $this->cartao_debito,
             ]);
         } else {
             $primeiro = $user->lancamentos()->create([
@@ -267,6 +278,7 @@ class LancamentoForm extends Component
                 'observacao' => $this->observacao ?: null,
                 'pago' => $this->pago,
                 'abate_saldo' => $this->abate_saldo,
+                'cartao_debito' => $this->cartao_debito,
             ]);
 
             for ($i = 2; $i <= $qtd; $i++) {
@@ -286,6 +298,7 @@ class LancamentoForm extends Component
                     'observacao' => $this->observacao ?: null,
                 'pago' => $this->pago,
                 'abate_saldo' => $this->abate_saldo,
+                'cartao_debito' => $this->cartao_debito,
                 ]);
             }
         }

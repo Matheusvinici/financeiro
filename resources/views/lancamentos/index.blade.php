@@ -87,7 +87,7 @@
                                     {{ $l->descricao }}
                                     @if ($l->isParcela())<span class="badge bg-secondary ms-1">parcela {{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
                                     @if ($l->recorrente)<span class="badge bg-info ms-1">fixo</span>@endif
-                                    @if ($l->tipo === 'despesa' && !$l->pago && $l->forma_pagamento !== 'cartao')<span class="badge bg-danger ms-1">a pagar</span>@endif
+                                    @if ($l->tipo === 'despesa' && !$l->pago && ($l->forma_pagamento !== 'cartao' || $l->cartao_debito))<span class="badge bg-danger ms-1">a pagar</span>@endif
                                     @if (!$l->abate_saldo)<span class="badge bg-info text-dark ms-1">não abate</span>@endif
                                     @if ($l->observacao)<div class="small text-muted">{{ $l->observacao }}</div>@endif
                                 </td>

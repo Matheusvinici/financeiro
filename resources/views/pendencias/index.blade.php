@@ -62,6 +62,12 @@
             <div class="stat-label">Não abatem do saldo</div>
             <div class="stat-sub">Pagas por você, de terceiros</div>
         </div>
+        <div class="stat-card green">
+            <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-value">R$ {{ number_format($totalPago, 2, ',', '.') }}</div>
+            <div class="stat-label">Total pago no mês</div>
+            <div class="stat-sub">Contas e faturas quitadas no período</div>
+        </div>
     </div>
 
     <div class="card shadow-sm">
@@ -82,51 +88,91 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($pendencias as $l)
-                            @php
-                                $venceHoje = $l->data && $l->data->copy()->startOfDay()->eq($hoje->copy()->startOfDay());
-                                $vencida = $l->data && $l->data->copy()->startOfDay()->lt($hoje->copy()->startOfDay());
-                                $proxima = $l->data && $l->data->copy()->startOfDay()->between($hoje->copy()->startOfDay()->addDay(), $hoje->copy()->addDays(3)->startOfDay());
-                                $linha = $vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light');
-                            @endphp
-                            <tr class="{{ $linha }}">
-                                <td class="text-nowrap">
-                                    <strong>{{ $l->data?->translatedFormat('d/m') }}</strong>
-                                    <span class="d-block small text-muted">{{ $l->data?->translatedFormat('D') }}</span>
-                                </td>
-                                <td>
-                                    <strong>{{ $l->descricao }}</strong>
-                                    @if ($l->isParcela())<span class="badge bg-secondary ms-1">parcela {{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
-                                    @if (!$l->abate_saldo)<span class="badge bg-info text-dark ms-1" title="Pago por você mas não sai do seu saldo">não abate</span>@endif
-                                    @if ($l->observacao)<div class="small text-muted">{{ $l->observacao }}</div>@endif
-                                </td>
-                                <td>{{ $l->categoria?->nome ?? '—' }}</td>
-                                <td class="text-end fw-bold">R$ {{ number_format($l->valor, 2, ',', '.') }}</td>
-                                <td>
-                                    @if ($vencida || $venceHoje)
-                                        <span class="badge bg-danger">Venceu hoje / vencida</span>
-                                    @elseif ($proxima)
-                                        <span class="badge bg-warning text-dark">Vence em breve</span>
-                                    @else
-                                        <span class="badge bg-secondary">A vencer</span>
-                                    @endif
-                                </td>
-                                <td class="text-end text-nowrap">
-                                    <form method="POST" action="{{ route('pendencias.pagar', $l) }}" class="d-inline">
-                                        @csrf
-                                        <button class="btn btn-sm btn-success" title="Marcar como pago"><i class="fa-solid fa-check me-1"></i>Pagar</button>
-                                    </form>
-                                    <form method="POST" action="{{ route('pendencias.abate', $l) }}" class="d-inline" title="{{ $l->abate_saldo ? 'Marcar como não abate (pago por terceiros)' : 'Marcar como abate do saldo' }}">
-                                        @csrf
-                                        <button class="btn btn-sm btn-outline-info"><i class="fa-solid fa-arrows-rotate"></i></button>
-                                    </form>
-                                    <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a>
-                                    <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento?')">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
-                                    </form>
-                                </td>
-                            </tr>
+                        @forelse ($pendentes as $l)
+                            @if ($l->is_fatura ?? false)
+                                @php
+                                    $venceHoje = $l->data->copy()->startOfDay()->eq($hoje->copy()->startOfDay());
+                                    $vencida = $l->data->copy()->startOfDay()->lt($hoje->copy()->startOfDay());
+                                    $proxima = $l->data->copy()->startOfDay()->between($hoje->copy()->startOfDay()->addDay(), $hoje->copy()->addDays(3)->startOfDay());
+                                    $linha = $vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light');
+                                @endphp
+                                <tr class="{{ $linha }}">
+                                    <td class="text-nowrap">
+                                        <strong>{{ $l->data->translatedFormat('d/m') }}</strong>
+                                        <span class="d-block small text-muted">{{ $l->data->translatedFormat('D') }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ $l->fatura_cartao->nome }}</strong>
+                                        <span class="badge bg-primary ms-1" title="Fatura do cartão de {{ $l->fatura_cartao->tipo_label }}">fatura {{ $l->fatura_cartao->tipo_label }}</span>
+                                        <span class="d-block small text-muted">{{ $l->fatura_qtd }} compra(s) no cartão</span>
+                                    </td>
+                                    <td>—</td>
+                                    <td class="text-end fw-bold">R$ {{ number_format($l->fatura_total, 2, ',', '.') }}</td>
+                                    <td>
+                                        @if ($vencida || $venceHoje)
+                                            <span class="badge bg-danger">Fatura vencida</span>
+                                        @elseif ($proxima)
+                                            <span class="badge bg-warning text-dark">Fatura vence em breve</span>
+                                        @else
+                                            <span class="badge bg-primary">Fatura a pagar</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <form method="POST" action="{{ route('pendencias.fatura', $l->fatura_cartao) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="mes" value="{{ $mesAtual }}">
+                                            <input type="hidden" name="ano" value="{{ $ano }}">
+                                            <button class="btn btn-sm btn-success" title="Marcar fatura como paga"><i class="fa-solid fa-check me-1"></i>Pagar</button>
+                                        </form>
+                                        <a href="{{ route('cartoes.index') }}" class="btn btn-sm btn-outline-primary" title="Ver cartões"><i class="fa-solid fa-credit-card"></i></a>
+                                    </td>
+                                </tr>
+                            @else
+                                @php
+                                    $venceHoje = $l->data && $l->data->copy()->startOfDay()->eq($hoje->copy()->startOfDay());
+                                    $vencida = $l->data && $l->data->copy()->startOfDay()->lt($hoje->copy()->startOfDay());
+                                    $proxima = $l->data && $l->data->copy()->startOfDay()->between($hoje->copy()->startOfDay()->addDay(), $hoje->copy()->addDays(3)->startOfDay());
+                                    $linha = $vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light');
+                                @endphp
+                                <tr class="{{ $linha }}">
+                                    <td class="text-nowrap">
+                                        <strong>{{ $l->data?->translatedFormat('d/m') }}</strong>
+                                        <span class="d-block small text-muted">{{ $l->data?->translatedFormat('D') }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ $l->descricao }}</strong>
+                                        @if ($l->isParcela())<span class="badge bg-secondary ms-1">parcela {{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
+                                        @if (!$l->abate_saldo)<span class="badge bg-info text-dark ms-1" title="Pago por você mas não sai do seu saldo">não abate</span>@endif
+                                        @if ($l->observacao)<div class="small text-muted">{{ $l->observacao }}</div>@endif
+                                    </td>
+                                    <td>{{ $l->categoria?->nome ?? '—' }}</td>
+                                    <td class="text-end fw-bold">R$ {{ number_format($l->valor, 2, ',', '.') }}</td>
+                                    <td>
+                                        @if ($vencida || $venceHoje)
+                                            <span class="badge bg-danger">Venceu hoje / vencida</span>
+                                        @elseif ($proxima)
+                                            <span class="badge bg-warning text-dark">Vence em breve</span>
+                                        @else
+                                            <span class="badge bg-secondary">A vencer</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <form method="POST" action="{{ route('pendencias.pagar', $l) }}" class="d-inline">
+                                            @csrf
+                                            <button class="btn btn-sm btn-success" title="Marcar como pago"><i class="fa-solid fa-check me-1"></i>Pagar</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('pendencias.abate', $l) }}" class="d-inline" title="{{ $l->abate_saldo ? 'Marcar como não abate (pago por terceiros)' : 'Marcar como abate do saldo' }}">
+                                            @csrf
+                                            <button class="btn btn-sm btn-outline-info"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                        </form>
+                                        <a href="{{ route('lancamentos.edit', $l) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a>
+                                        <form method="POST" action="{{ route('lancamentos.destroy', $l) }}" class="d-inline" onsubmit="return confirm('Excluir este lançamento?')">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endif
                         @empty
                             <tr>
                                 <td colspan="6" class="text-center text-muted py-5">

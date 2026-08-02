@@ -24,10 +24,11 @@ class CartaoController extends Controller
 
         $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo) {
             $gastoPeriodo = (float) $cartao->lancamentos()
-                ->where('tipo', 'despesa')->quando($periodo, $ano, $mesAtual)->sum('valor');
+                ->where('tipo', 'despesa')->where('cartao_debito', false)->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $parcelasPeriodo = (float) $cartao->lancamentos()
                 ->where('tipo', 'despesa')->where('qtd_parcelas', '>', 1)
+                ->where('cartao_debito', false)
                 ->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $avistaPeriodo = $gastoPeriodo - $parcelasPeriodo;
@@ -50,6 +51,7 @@ class CartaoController extends Controller
         $parcelasFuturas = $user->lancamentos()
             ->where('tipo', 'despesa')
             ->whereNotNull('cartao_id')
+            ->where('cartao_debito', false)
             ->whereBetween('data', [$inicio, $fim])
             ->selectRaw('cartao_id, YEAR(data) as y, MONTH(data) as m, SUM(valor) as total')
             ->groupBy('cartao_id', 'y', 'm')->get();

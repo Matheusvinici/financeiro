@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Cartao extends Model
 {
@@ -27,6 +28,36 @@ class Cartao extends Model
     public function faturaPaga(int $mes, int $ano): bool
     {
         return (int) $this->fatura_paga_mes === $mes && (int) $this->fatura_paga_ano === $ano;
+    }
+
+    /**
+     * Retorna "YYYY-MM" do vencimento da fatura em que esta compra entra,
+     * considerando o ciclo fechamento -> vencimento do cartão.
+     */
+    public function faturaChave(Carbon $data): string
+    {
+        $ano = $data->year;
+        $mes = $data->month;
+
+        $fechamento = (int) $this->dia_fechamento;
+        if ($fechamento > 0 && $data->day > $fechamento) {
+            $mes++;
+            if ($mes > 12) {
+                $mes = 1;
+                $ano++;
+            }
+        }
+
+        $vencimento = (int) $this->dia_vencimento;
+        if ($vencimento > 0 && $vencimento < $fechamento) {
+            $mes++;
+            if ($mes > 12) {
+                $mes = 1;
+                $ano++;
+            }
+        }
+
+        return sprintf('%04d-%02d', $ano, $mes);
     }
 
     public function user(): BelongsTo

@@ -48,7 +48,7 @@
                 @error('data')<div class="text-danger small">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-4 {{ $tipo === 'despesa' && $forma_pagamento === 'cartao' ? '' : '' }}" id="categoria_div">
-                @if ($tipo === 'despesa' && $forma_pagamento === 'cartao')
+                @if ($tipo === 'despesa' && $forma_pagamento === 'cartao' && !$this->cartao_debito)
                     <label class="form-label">Categoria</label>
                     <div class="alert alert-dark py-2 mb-0">
                         <i class="fa-solid fa-credit-card me-1"></i><strong>Gasto com cartão</strong>
@@ -86,7 +86,7 @@
                     </div>
                 </div>
 
-                @if ($this->itens->isNotEmpty() && $forma_pagamento !== 'cartao')
+                @if ($this->itens->isNotEmpty() && ($forma_pagamento !== 'cartao' || $this->cartao_debito))
                 <div class="col-md-4" wire:key="campo-item">
                     <label class="form-label">Item</label>
                     <select wire:model="subcategoria_id" class="form-select">
@@ -127,14 +127,37 @@
                     </select>
                 </div>
 
-                <div class="col-md-{{ $this->itens->isNotEmpty() ? 4 : 6 }} {{ $forma_pagamento === 'cartao' ? '' : 'd-none' }}" id="cartao_div">
-                    <label class="form-label">Cartão utilizado</label>
-                    <select wire:model="cartao_id" class="form-select">
-                        <option value="">— Nenhum —</option>
-                        @foreach ($this->cartoes as $cartao)
-                            <option value="{{ $cartao->id }}">{{ $cartao->nome }} ({{ $cartao->tipo_label }})</option>
-                        @endforeach
-                    </select>
+                <div class="col-12 {{ $forma_pagamento === 'cartao' ? '' : 'd-none' }}" id="cartao_div">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label class="form-label">Tipo de gasto no cartão</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="cartao_tipo" id="cartao-credito" value="0" wire:model.live="cartao_debito">
+                                    <label class="btn btn-outline-primary btn-lg w-100 text-start" for="cartao-credito">
+                                        <strong>Crédito</strong>
+                                        <small class="d-block opacity-75">Vai para a fatura</small>
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="cartao_tipo" id="cartao-debito" value="1" wire:model.live="cartao_debito">
+                                    <label class="btn btn-outline-secondary btn-lg w-100 text-start" for="cartao-debito">
+                                        <strong>Débito</strong>
+                                        <small class="d-block opacity-75">Sai na hora</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label">Cartão utilizado</label>
+                            <select wire:model="cartao_id" class="form-select">
+                                <option value="">— Nenhum —</option>
+                                @foreach ($this->cartoes as $cartao)
+                                    <option value="{{ $cartao->id }}">{{ $cartao->nome }} ({{ $cartao->tipo_label }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
                 </div>
             @endif
 

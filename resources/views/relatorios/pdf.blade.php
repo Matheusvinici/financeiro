@@ -19,8 +19,9 @@
     </style>
 </head>
 <body>
-    <h2>Meu Financeiro — Relatório {{ $ano }}</h2>
-    <div class="sub">Balanço financeiro anual gerado em {{ now()->translatedFormat('d/m/Y H:i') }}</div>
+    @php $listaMeses = $mesAtual ? [$mesAtual] : range(1, 12); $colspan = count($listaMeses) + 2; @endphp
+    <h2>Meu Financeiro — Relatório {{ $ano }}{{ $mesAtual ? ' · ' . \Carbon\Carbon::create()->month($mesAtual)->translatedFormat('F') : '' }}</h2>
+    <div class="sub">Balanço financeiro {{ $mesAtual ? 'mensal' : 'anual' }} gerado em {{ now()->translatedFormat('d/m/Y H:i') }}</div>
 
     <table>
         <tr class="bg-suave">
@@ -41,7 +42,7 @@
         <thead>
             <tr>
                 <th>Categoria / Item</th>
-                @foreach (range(1, 12) as $m)
+                @foreach ($listaMeses as $m)
                     <th class="text-center">{{ \Carbon\Carbon::create()->month($m)->translatedFormat('M') }}</th>
                 @endforeach
                 <th class="text-center">TOTAL</th>
@@ -50,12 +51,12 @@
         <tbody>
             @foreach (['receitas' => 'Receitas', 'despesas' => 'Despesas'] as $tipo => $titulo)
                 <tr>
-                    <td colspan="14" class="negrito">{{ $titulo }}</td>
+                    <td colspan="{{ $colspan }}" class="negrito">{{ $titulo }}</td>
                 </tr>
                 @foreach ($agrupadas[$tipo] ?? [] as $categoriaNome => $itens)
                     <tr class="bg-suave">
                         <td class="negrito">{{ $categoriaNome }}</td>
-                        @foreach (range(1, 12) as $m)
+                        @foreach ($listaMeses as $m)
                             <td class="text-end">{{ number_format(collect($itens)->sum(fn ($i) => $i[$m] ?? 0), 2, ',', '.') }}</td>
                         @endforeach
                         <td class="text-end negrito">{{ number_format(collect($itens)->sum(fn ($i) => collect($i)->sum()), 2, ',', '.') }}</td>
@@ -63,7 +64,7 @@
                     @foreach ($itens as $itemNome => $valores)
                         <tr>
                             <td>{{ $itemNome }}</td>
-                            @foreach (range(1, 12) as $m)
+                            @foreach ($listaMeses as $m)
                                 <td class="text-end">{{ ($valores[$m] ?? 0) ? number_format($valores[$m], 2, ',', '.') : '' }}</td>
                             @endforeach
                             <td class="text-end">{{ number_format(collect($valores)->sum(), 2, ',', '.') }}</td>

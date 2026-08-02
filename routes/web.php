@@ -41,7 +41,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/relatorios/mensal', [RelatorioController::class, 'mensal'])->name('relatorios.mensal');
     Route::get('/relatorios/pdf', [RelatorioController::class, 'exportarPdf'])->name('relatorios.pdf');
 
-    Route::resource('contas-pagar', ContaPagarController::class)->except(['create', 'show', 'edit']);
+    Route::get('/contas-pagar', [ContaPagarController::class, 'index'])->name('contas-pagar.index');
+    Route::post('/contas-pagar', [ContaPagarController::class, 'store'])->name('contas-pagar.store');
+    Route::put('/contas-pagar/{conta}', [ContaPagarController::class, 'update'])->name('contas-pagar.update');
+    Route::delete('/contas-pagar/{conta}', [ContaPagarController::class, 'destroy'])->name('contas-pagar.destroy');
     Route::post('/contas-pagar/{conta}/pagar', [ContaPagarController::class, 'pagar'])->name('contas-pagar.pagar');
 
     Route::resource('compartilhamentos', CompartilhamentoController::class)->except(['create', 'show', 'edit']);

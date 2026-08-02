@@ -13,18 +13,25 @@ class RelatorioController extends Controller
     {
         $user = auth()->user();
         $ano = (int) $request->input('ano', Carbon::now()->year);
+        $mes = $request->input('mes', 'todos');
+        $mes = $mes === 'todos' || $mes === '' ? 'todos' : (int) $mes;
+        $mesAtual = $mes === 'todos' ? null : $mes;
 
         $receitas = $user->lancamentos()->where('tipo', 'receita')
-            ->whereYear('data', $ano)->with('categoria', 'subcategoria')->get();
+            ->whereYear('data', $ano)
+            ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->with('categoria', 'subcategoria')->get();
         $despesas = $user->lancamentos()->where('tipo', 'despesa')
-            ->whereYear('data', $ano)->with('categoria', 'subcategoria')->get();
+            ->whereYear('data', $ano)
+            ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->with('categoria', 'subcategoria')->get();
 
         $agrupadas = $this->agruparPorCategoria($receitas, $despesas);
 
         $totaisMesReceitas = [];
         $totaisMesDespesas = [];
         $totaisAno = [];
-        for ($m = 1; $m <= 12; $m++) {
+        foreach ($mesAtual ? [$mesAtual] : range(1, 12) as $m) {
             $totaisMesReceitas[$m] = $receitas->filter(fn ($l) => $l->data->month === $m)->sum('valor');
             $totaisMesDespesas[$m] = $despesas->filter(fn ($l) => $l->data->month === $m)->sum('valor');
         }
@@ -33,23 +40,25 @@ class RelatorioController extends Controller
         $totaisAno['saldo'] = $totaisAno['receitas'] - $totaisAno['despesas'];
 
         $saldoMes = [];
-        for ($m = 1; $m <= 12; $m++) {
-            $saldoMes[$m] = $totaisMesReceitas[$m] - $totaisMesDespesas[$m];
+        foreach ($mesAtual ? [$mesAtual] : range(1, 12) as $m) {
+            $saldoMes[$m] = ($totaisMesReceitas[$m] ?? 0) - ($totaisMesDespesas[$m] ?? 0);
         }
 
         $cartoes = $user->cartoes()->orderBy('nome')->get();
         $gastosCartaoMes = [];
         foreach ($cartoes as $cartao) {
             $gastosCartaoMes[$cartao->id] = [];
-            for ($m = 1; $m <= 12; $m++) {
+            foreach ($mesAtual ? [$mesAtual] : range(1, 12) as $m) {
                 $gastosCartaoMes[$cartao->id][$m] = (float) $cartao->lancamentos()
-                    ->where('tipo', 'despesa')->whereYear('data', $ano)->whereMonth('data', $m)
+                    ->where('tipo', 'despesa')
+                    ->where('cartao_debito', false)
+                    ->whereYear('data', $ano)->whereMonth('data', $m)
                     ->sum('valor');
             }
         }
 
         return view('relatorios.mensal', compact(
-            'ano', 'agrupadas', 'totaisMesReceitas', 'totaisMesDespesas',
+            'ano', 'mes', 'mesAtual', 'agrupadas', 'totaisMesReceitas', 'totaisMesDespesas',
             'saldoMes', 'totaisAno', 'cartoes', 'gastosCartaoMes'
         ));
     }
@@ -58,17 +67,24 @@ class RelatorioController extends Controller
     {
         $user = auth()->user();
         $ano = (int) $request->input('ano', Carbon::now()->year);
+        $mes = $request->input('mes', 'todos');
+        $mes = $mes === 'todos' || $mes === '' ? 'todos' : (int) $mes;
+        $mesAtual = $mes === 'todos' ? null : $mes;
 
         $receitas = $user->lancamentos()->where('tipo', 'receita')
-            ->whereYear('data', $ano)->with('categoria', 'subcategoria')->get();
+            ->whereYear('data', $ano)
+            ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->with('categoria', 'subcategoria')->get();
         $despesas = $user->lancamentos()->where('tipo', 'despesa')
-            ->whereYear('data', $ano)->with('categoria', 'subcategoria')->get();
+            ->whereYear('data', $ano)
+            ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->with('categoria', 'subcategoria')->get();
 
         $agrupadas = $this->agruparPorCategoria($receitas, $despesas);
 
         $totaisMesReceitas = [];
         $totaisMesDespesas = [];
-        for ($m = 1; $m <= 12; $m++) {
+        foreach ($mesAtual ? [$mesAtual] : range(1, 12) as $m) {
             $totaisMesReceitas[$m] = $receitas->filter(fn ($l) => $l->data->month === $m)->sum('valor');
             $totaisMesDespesas[$m] = $despesas->filter(fn ($l) => $l->data->month === $m)->sum('valor');
         }
@@ -78,7 +94,7 @@ class RelatorioController extends Controller
             'saldo' => $receitas->sum('valor') - $despesas->sum('valor'),
         ];
 
-        $pdf = Pdf::loadView('relatorios.pdf', compact('ano', 'agrupadas', 'totaisMesReceitas', 'totaisMesDespesas', 'totaisAno'));
+        $pdf = Pdf::loadView('relatorios.pdf', compact('ano', 'mes', 'mesAtual', 'agrupadas', 'totaisMesReceitas', 'totaisMesDespesas', 'totaisAno'));
 
         return $pdf->download("relatorio-financeiro-{$ano}.pdf");
     }
