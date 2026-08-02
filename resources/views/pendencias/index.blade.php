@@ -56,11 +56,17 @@
             <div class="stat-label">Vencendo nos próximos 3 dias</div>
             <div class="stat-sub">Inclui contas vencidas</div>
         </div>
+        <div class="stat-card blue">
+            <div class="stat-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+            <div class="stat-value">R$ {{ number_format($totalAbate, 2, ',', '.') }}</div>
+            <div class="stat-label">Sai do meu dinheiro</div>
+            <div class="stat-sub">Contas e faturas que abatem do saldo</div>
+        </div>
         <div class="stat-card purple">
             <div class="stat-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
             <div class="stat-value">R$ {{ number_format($totalNaoAbate, 2, ',', '.') }}</div>
             <div class="stat-label">Não abatem do saldo</div>
-            <div class="stat-sub">Pagas por você, de terceiros</div>
+            <div class="stat-sub">Pagas por terceiros</div>
         </div>
         <div class="stat-card green">
             <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>

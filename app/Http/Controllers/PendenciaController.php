@@ -97,6 +97,7 @@ class PendenciaController extends Controller
 
         $totalPendente = $pendencias->sum('valor') + $faturaPendentes->sum('fatura_total');
         $totalNaoAbate = $pendencias->where('abate_saldo', false)->sum('valor');
+        $totalAbate = $totalPendente - $totalNaoAbate;
         $totalUrgente = $pendencias->filter(fn ($l) => $l->data && $l->data->copy()->startOfDay()->lte($hoje->copy()->addDays(3)))->sum('valor')
             + $faturaPendentes->filter(fn ($f) => $f->data->copy()->startOfDay()->lte($hoje->copy()->addDays(3)))->sum('fatura_total');
 
@@ -122,7 +123,7 @@ class PendenciaController extends Controller
 
         return view('pendencias.index', compact(
             'pendencias', 'pagas', 'faturasCartao', 'pendentes', 'mes', 'ano', 'mesAtual', 'hoje',
-            'totalPendente', 'totalNaoAbate', 'totalUrgente', 'totalPago', 'mesesDisponiveis'
+            'totalPendente', 'totalNaoAbate', 'totalAbate', 'totalUrgente', 'totalPago', 'mesesDisponiveis'
         ));
     }
 
