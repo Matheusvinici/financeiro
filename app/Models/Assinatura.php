@@ -56,7 +56,7 @@ class Assinatura extends Model
             fn ($data) => $data->format('Y-m')
         )->flip();
 
-        $dia = $this->diaDeCobranca();
+        $dia = (int) $this->dia_cobranca ?: (int) $this->cartao?->dia_vencimento ?: 15;
         $chaveAtual = $agora->format('Y-m');
 
         for ($mes = $inicio->copy(); $mes->lte($fim); $mes->addMonth()) {
@@ -103,25 +103,5 @@ class Assinatura extends Model
     public function lancamentos(): HasMany
     {
         return $this->hasMany(Lancamento::class);
-    }
-
-    public function diaDeCobranca(): int
-    {
-        return (int) $this->dia_cobranca ?: (int) $this->cartao?->dia_vencimento ?: 15;
-    }
-
-    public function jaIniciou(?Carbon $ref = null): bool
-    {
-        $ref = $ref ?? Carbon::now();
-        $inicio = $this->data_inicio ?? $this->created_at;
-
-        return $inicio->lessThanOrEqualTo($ref) || $inicio->isSameMonth($ref);
-    }
-
-    public function cobrancaChegou(?Carbon $ref = null): bool
-    {
-        $ref = $ref ?? Carbon::now();
-
-        return $ref->day >= $this->diaDeCobranca();
     }
 }

@@ -28,12 +28,11 @@ class CartaoController extends Controller
 
         $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo) {
             $gastoPeriodo = (float) $cartao->lancamentos()
-                ->where('tipo', 'despesa')->where('cartao_debito', false)->contabilizadas()->quando($periodo, $ano, $mesAtual)->sum('valor');
+                ->where('tipo', 'despesa')->where('cartao_debito', false)->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $parcelasPeriodo = (float) $cartao->lancamentos()
                 ->where('tipo', 'despesa')->where('qtd_parcelas', '>', 1)
                 ->where('cartao_debito', false)
-                ->contabilizadas()
                 ->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $avistaPeriodo = $gastoPeriodo - $parcelasPeriodo;
@@ -51,9 +50,7 @@ class CartaoController extends Controller
 
         $assinaturas = $user->assinaturas()->with(['cartao', 'categoria'])
             ->orderByDesc('ativo')->orderBy('nome')->get();
-        $totalAssinaturas = (float) $assinaturas->filter(function (Assinatura $ass) {
-            return $ass->ativo && $ass->jaIniciou() && $ass->cobrancaChegou();
-        })->sum('valor');
+        $totalAssinaturas = (float) $assinaturas->where('ativo', true)->sum('valor');
 
         $ajustes = $user->lancamentos()
             ->with('cartao')

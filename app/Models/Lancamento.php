@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 class Lancamento extends Model
 {
@@ -129,13 +128,5 @@ class Lancamento extends Model
         }
 
         return $q;
-    }
-
-    public function scopeContabilizadas(Builder $q): Builder
-    {
-        return $q->where(function (Builder $sub) {
-            $sub->whereNull('assinatura_id')
-                ->orWhereDate('data', '<=', Carbon::now());
-        });
     }
 }
