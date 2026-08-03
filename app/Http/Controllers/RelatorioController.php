@@ -25,6 +25,7 @@ class RelatorioController extends Controller
             ->where('abate_saldo', true)
             ->whereYear('data', $ano)
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->contabilizadas()
             ->with('categoria', 'subcategoria')->get();
         $despesasNaoAbateLista = $user->lancamentos()->where('tipo', 'despesa')
             ->where('abate_saldo', false)
@@ -63,6 +64,7 @@ class RelatorioController extends Controller
                 $gastosCartaoMes[$cartao->id][$m] = (float) $cartao->lancamentos()
                     ->where('tipo', 'despesa')
                     ->where('cartao_debito', false)
+                    ->contabilizadas()
                     ->whereYear('data', $ano)->whereMonth('data', $m)
                     ->sum('valor');
             }
@@ -91,6 +93,7 @@ class RelatorioController extends Controller
             ->where('abate_saldo', true)
             ->whereYear('data', $ano)
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
+            ->contabilizadas()
             ->with('categoria', 'subcategoria')->get();
 
         $agrupadas = $this->agruparPorCategoria($receitas, $despesas);
