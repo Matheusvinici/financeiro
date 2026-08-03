@@ -100,7 +100,10 @@
                                     $venceHoje = $l->data->copy()->startOfDay()->eq($hoje->copy()->startOfDay());
                                     $vencida = $l->data->copy()->startOfDay()->lt($hoje->copy()->startOfDay());
                                     $proxima = $l->data->copy()->startOfDay()->between($hoje->copy()->startOfDay()->addDay(), $hoje->copy()->addDays(3)->startOfDay());
-                                    $linha = $vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light');
+                                    $ehAtrasada = $l->atrasada ?? false;
+                                    $linha = $ehAtrasada
+                                        ? 'table-danger'
+                                        : ($vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light'));
                                 @endphp
                                 <tr class="{{ $linha }}">
                                     <td class="text-nowrap">
@@ -110,12 +113,17 @@
                                     <td>
                                         <strong>{{ $l->fatura_cartao->nome }}</strong>
                                         <span class="badge bg-primary ms-1" title="Fatura do cartão de {{ $l->fatura_cartao->tipo_label }}">fatura {{ $l->fatura_cartao->tipo_label }}</span>
+                                        @if ($ehAtrasada)
+                                            <span class="badge bg-danger ms-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Dívida de {{ \Carbon\Carbon::create($l->fatura_ano, $l->fatura_mes, 1)->translatedFormat('F/Y') }}</span>
+                                        @endif
                                         <span class="d-block small text-muted">{{ $l->fatura_qtd }} compra(s) no cartão</span>
                                     </td>
                                     <td>—</td>
                                     <td class="text-end fw-bold">R$ {{ number_format($l->fatura_total, 2, ',', '.') }}</td>
                                     <td>
-                                        @if ($vencida || $venceHoje)
+                                        @if ($ehAtrasada)
+                                            <span class="badge bg-danger"><i class="fa-solid fa-clock me-1"></i>{{ $l->dias_atraso ?? 0 }} dia(s) atrasada</span>
+                                        @elseif ($vencida || $venceHoje)
                                             <span class="badge bg-danger">Fatura vencida</span>
                                         @elseif ($proxima)
                                             <span class="badge bg-warning text-dark">Fatura vence em breve</span>
@@ -138,7 +146,11 @@
                                     $venceHoje = $l->data && $l->data->copy()->startOfDay()->eq($hoje->copy()->startOfDay());
                                     $vencida = $l->data && $l->data->copy()->startOfDay()->lt($hoje->copy()->startOfDay());
                                     $proxima = $l->data && $l->data->copy()->startOfDay()->between($hoje->copy()->startOfDay()->addDay(), $hoje->copy()->addDays(3)->startOfDay());
-                                    $linha = $vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light');
+                                    $ehAtrasada = $l->atrasada ?? false;
+                                    $diasAtraso = $l->dias_atraso ?? 0;
+                                    $linha = $ehAtrasada
+                                        ? 'table-danger'
+                                        : ($vencida || $venceHoje ? 'table-danger-subtle' : ($proxima ? 'table-warning-subtle' : 'table-light'));
                                 @endphp
                                 <tr class="{{ $linha }}">
                                     <td class="text-nowrap">
@@ -147,6 +159,10 @@
                                     </td>
                                     <td>
                                         <strong>{{ $l->descricao }}</strong>
+                                        @if ($ehAtrasada)
+                                            <span class="badge bg-danger ms-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Vencida há {{ $diasAtraso }} dia(s)</span>
+                                            <span class="badge bg-dark ms-1">Mês: {{ $l->data?->translatedFormat('M/Y') }}</span>
+                                        @endif
                                         @if ($l->isParcela())<span class="badge bg-secondary ms-1">parcela {{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
                                         @if (!$l->abate_saldo)<span class="badge bg-info text-dark ms-1" title="Pago por você mas não sai do seu saldo">não abate</span>@endif
                                         @if ($l->observacao)<div class="small text-muted">{{ $l->observacao }}</div>@endif
@@ -154,8 +170,10 @@
                                     <td>{{ $l->categoria?->nome ?? '—' }}</td>
                                     <td class="text-end fw-bold">R$ {{ number_format($l->valor, 2, ',', '.') }}</td>
                                     <td>
-                                        @if ($vencida || $venceHoje)
-                                            <span class="badge bg-danger">Venceu hoje / vencida</span>
+                                        @if ($ehAtrasada)
+                                            <span class="badge bg-danger"><i class="fa-solid fa-clock me-1"></i>{{ $diasAtraso }} dia(s) atrasada</span>
+                                        @elseif ($vencida || $venceHoje)
+                                            <span class="badge bg-danger">Vencida</span>
                                         @elseif ($proxima)
                                             <span class="badge bg-warning text-dark">Vence em breve</span>
                                         @else

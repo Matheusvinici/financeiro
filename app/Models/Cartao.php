@@ -13,21 +13,56 @@ class Cartao extends Model
 
     protected $fillable = [
         'user_id', 'nome', 'tipo', 'bandeira', 'limite', 'dia_fechamento', 'dia_vencimento', 'ativo',
-        'fatura_paga_mes', 'fatura_paga_ano',
+        'faturas_pagas',
     ];
 
     protected $casts = [
         'limite' => 'decimal:2',
         'dia_fechamento' => 'integer',
         'dia_vencimento' => 'integer',
-        'fatura_paga_mes' => 'integer',
-        'fatura_paga_ano' => 'integer',
+        'faturas_pagas' => 'array',
         'ativo' => 'boolean',
     ];
 
     public function faturaPaga(int $mes, int $ano): bool
     {
-        return (int) $this->fatura_paga_mes === $mes && (int) $this->fatura_paga_ano === $ano;
+        $pagas = $this->faturas_pagas ?? [];
+        return collect($pagas)->contains(fn ($f) => (int) $f['mes'] === $mes && (int) $f['ano'] === $ano);
+    }
+
+    public function marcarFaturaPaga(int $mes, int $ano): void
+    {
+        $pagas = $this->faturas_pagas ?? [];
+        if (!$this->faturaPaga($mes, $ano)) {
+            $pagas[] = ['mes' => $mes, 'ano' => $ano];
+            $this->update(['faturas_pagas' => $pagas]);
+        }
+    }
+
+    public function desmarcarFaturaPaga(int $mes, int $ano): void
+    {
+        $pagas = collect($this->faturas_pagas ?? []);
+        $pagas = $pagas->filter(fn ($f) => !((int) $f['mes'] === $mes && (int) $f['ano'] === $ano))->values();
+        $this->update(['faturas_pagas' => $pagas->toArray()]);
+    }
+
+    /**
+     * Retorna a primeira fatura não paga (mes/ano) ou null se todas estiverem pagas.
+     */
+    public function primeiraFaturaNaoPaga(): ?array
+    {
+        $pagas = collect($this->faturas_pagas ?? []);
+        $hoje = now();
+
+        for ($i = 0; $i < 24; $i++) {
+            $mes = $hoje->copy()->subMonths($i)->month;
+            $ano = $hoje->copy()->subMonths($i)->year;
+            if (!$pagas->contains(fn ($f) => (int) $f['mes'] === $mes && (int) $f['ano'] === $ano)) {
+                return ['mes' => $mes, 'ano' => $ano];
+            }
+        }
+
+        return null;
     }
 
     /**
