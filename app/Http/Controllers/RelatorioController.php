@@ -23,6 +23,7 @@ class RelatorioController extends Controller
             ->with('categoria', 'subcategoria')->get();
         $despesas = $user->lancamentos()->where('tipo', 'despesa')
             ->where('abate_saldo', true)
+            ->semAssinaturasFuturas()
             ->whereYear('data', $ano)
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
             ->with('categoria', 'subcategoria')->get();
@@ -63,6 +64,7 @@ class RelatorioController extends Controller
                 $gastosCartaoMes[$cartao->id][$m] = (float) $cartao->lancamentos()
                     ->where('tipo', 'despesa')
                     ->where('cartao_debito', false)
+                    ->semAssinaturasFuturas()
                     ->whereYear('data', $ano)->whereMonth('data', $m)
                     ->sum('valor');
             }
@@ -89,6 +91,7 @@ class RelatorioController extends Controller
             ->with('categoria', 'subcategoria')->get();
         $despesas = $user->lancamentos()->where('tipo', 'despesa')
             ->where('abate_saldo', true)
+            ->semAssinaturasFuturas()
             ->whereYear('data', $ano)
             ->when($mesAtual, fn ($q) => $q->whereMonth('data', $mesAtual))
             ->with('categoria', 'subcategoria')->get();

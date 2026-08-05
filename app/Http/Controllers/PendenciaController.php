@@ -83,10 +83,21 @@ class PendenciaController extends Controller
             })
             ->values();
 
-        // Faturas em aberto: vencendo no período OU no mês seguinte (fatura em construção)
+        // Faturas em aberto: somente as que vencem dentro do período selecionado
         $fimPeriodo = $mesAtual === null
             ? Carbon::create($ano, 12, 31)
-            : Carbon::create($ano, $mesAtual, 1)->endOfMonth()->addMonth();
+            : Carbon::create($ano, $mesAtual, 1)->endOfMonth();
+
+        $inicioPeriodo = $mesAtual === null
+            ? Carbon::create($ano, 1, 1)
+            : Carbon::create($ano, $mesAtual, 1)->startOfDay();
+
+        // Só é atrasada uma conta que já venceu de verdade; ao abrir um mês futuro
+        // (ex.: setembro com hoje em agosto), contas ainda não vencidas não podem
+        // virar "dívida".
+        $limiteAtrasadas = $hoje->copy()->startOfDay()->lt($inicioPeriodo)
+            ? $hoje->copy()->startOfDay()
+            : $inicioPeriodo;
 
         $faturasCartao = $mesAtual === null
             ? $faturasTodas->filter(fn ($f) => $f['fatura_ano'] === $ano)
@@ -94,8 +105,10 @@ class PendenciaController extends Controller
                 fn ($f) => $f['vencimento']->copy()->startOfDay()->lte($fimPeriodo->copy()->endOfDay())
             )->values();
 
-        // Faturas pendentes do período em aberto
-        $faturaPendentes = $faturasCartao->filter(fn ($f) => !$f['pago'])
+        // Faturas pendentes do período em aberto (as de antes do período entram em "atrasadas")
+        $faturaPendentes = $faturasCartao->filter(
+            fn ($f) => !$f['pago'] && $f['vencimento']->copy()->startOfDay()->gte($inicioPeriodo->copy()->startOfDay())
+        )
             ->map(fn ($f) => (object) [
                 'is_fatura' => true,
                 'fatura_cartao' => $f['cartao'],
@@ -108,13 +121,9 @@ class PendenciaController extends Controller
             ]);
 
         // Faturas de meses ANTERIORES que continuam sem pagamento (atrasadas)
-        $inicioPeriodo = $mesAtual === null
-            ? Carbon::create($ano, 1, 1)
-            : Carbon::create($ano, $mesAtual, 1)->startOfDay();
-
-        $faturasAtrasadas = $faturasTodas->filter(function ($f) use ($inicioPeriodo) {
+        $faturasAtrasadas = $faturasTodas->filter(function ($f) use ($inicioPeriodo, $limiteAtrasadas) {
             return !$f['pago']
-                && $f['vencimento']->copy()->startOfDay()->lt($inicioPeriodo)
+                && $f['vencimento']->copy()->startOfDay()->lt($limiteAtrasadas)
                 && $f['vencimento']->copy()->startOfDay()->gte($inicioPeriodo->copy()->subMonths(24));
         })->map(function ($f) use ($hoje) {
             return (object) [
@@ -138,7 +147,7 @@ class PendenciaController extends Controller
                 ->where('tipo', 'despesa')
                 ->where('pago', false)
                 ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao')->orWhere('cartao_debito', true))
-                ->where('data', '<', $inicioPeriodo)
+                ->where('data', '<', $limiteAtrasadas)
                 ->orderBy('data')
                 ->get()
                 ->map(function ($l) use ($hoje) {

@@ -28,11 +28,12 @@ class CartaoController extends Controller
 
         $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo) {
             $gastoPeriodo = (float) $cartao->lancamentos()
-                ->where('tipo', 'despesa')->where('cartao_debito', false)->quando($periodo, $ano, $mesAtual)->sum('valor');
+                ->where('tipo', 'despesa')->where('cartao_debito', false)->semAssinaturasFuturas()->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $parcelasPeriodo = (float) $cartao->lancamentos()
                 ->where('tipo', 'despesa')->where('qtd_parcelas', '>', 1)
                 ->where('cartao_debito', false)
+                ->semAssinaturasFuturas()
                 ->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $avistaPeriodo = $gastoPeriodo - $parcelasPeriodo;

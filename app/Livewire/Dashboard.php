@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Assinatura;
 use App\Models\ContaPagar;
+use App\Services\ResumoFinanceiro;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -59,26 +60,11 @@ class Dashboard extends Component
 
         $receitasMes = (float) $user->lancamentos()->where('tipo', 'receita')
             ->quando($periodo, $ano, $mesAtual)->sum('valor');
-        $despesasMes = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->where('abate_saldo', true)->quando($periodo, $ano, $mesAtual)->sum('valor');
+        $despesasMes = ResumoFinanceiro::despesasPeriodo($user, $periodo, $ano, $mesAtual);
         $saldoMes = $receitasMes - $despesasMes;
 
-        $assinaturasPrevistas = 0.0;
-
-        if ($mes !== 'todos' && $ano === $hoje->year && $mes === $hoje->month) {
-            $jaLancadas = $user->lancamentos()
-                ->whereNotNull('assinatura_id')
-                ->whereYear('data', $ano)->whereMonth('data', $mes)
-                ->pluck('assinatura_id')->all();
-
-            $assinaturasPrevistas = (float) $user->assinaturas()
-                ->where('ativo', true)
-                ->whereNotIn('id', $jaLancadas)
-                ->sum('valor');
-
-            $despesasMes += $assinaturasPrevistas;
-            $saldoMes = $receitasMes - $despesasMes;
-        }
+        $assinaturasEntram = ResumoFinanceiro::assinaturasEntramCartao($user, $periodo, $ano, $mesAtual);
+        $totAssinaturasEntram = (float) $assinaturasEntram->sum('valor');
 
         if ($mes === 'todos') {
             $periodoAnterior = Carbon::create($ano - 1, 1, 1);
@@ -90,8 +76,7 @@ class Dashboard extends Component
 
         $receitasMesAnterior = (float) $user->lancamentos()->where('tipo', 'receita')
             ->quando($periodoAnt, $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
-        $despesasMesAnterior = (float) $user->lancamentos()->where('tipo', 'despesa')
-            ->where('abate_saldo', true)->quando($periodoAnt, $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
+        $despesasMesAnterior = ResumoFinanceiro::despesasPeriodo($user, $periodoAnt, $periodoAnterior->year, $periodoAnterior->month);
         $saldoMesAnterior = $receitasMesAnterior - $despesasMesAnterior;
 
         $saldoAno = (float) $user->lancamentos()->whereYear('data', $ano)
@@ -107,7 +92,7 @@ class Dashboard extends Component
             ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
 
         $despesasLista = $user->lancamentos()->with('categoria')
-            ->where('tipo', 'despesa')->where('abate_saldo', true)->quando($periodo, $ano, $mesAtual)
+            ->where('tipo', 'despesa')->where('abate_saldo', true)->semAssinaturasFuturas()->quando($periodo, $ano, $mesAtual)
             ->orderByDesc('data')->orderByDesc('id')
             ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
 
@@ -206,7 +191,7 @@ class Dashboard extends Component
             'saldoAno', 'totalContasAberto', 'contasAberto',
             'receitasLista', 'despesasLista',
             'alertas', 'simulador', 'graficos', 'ultimos',
-            'assinaturasPrevistas'
+            'assinaturasEntram', 'totAssinaturasEntram'
         ));
     }
 

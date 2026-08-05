@@ -131,6 +131,23 @@ class Lancamento extends Model
         };
     }
 
+    /**
+     * Exclui assinaturas cujo dia de cobrança ainda não chegou
+     * (ainda não entraram no cartão).
+     */
+    public function scopeSemAssinaturasFuturas(Builder $q): Builder
+    {
+        return $q->where(fn ($q) => $q->whereNull('assinatura_id')->orWhere('data', '<=', now()));
+    }
+
+    /**
+     * Somente assinaturas cujo dia de cobrança ainda não chegou.
+     */
+    public function scopeSoAssinaturasFuturas(Builder $q): Builder
+    {
+        return $q->whereNotNull('assinatura_id')->where('data', '>', now());
+    }
+
     public function scopeNoMes(Builder $q, int $ano, int $mes): Builder
     {
         return $q->whereYear('data', $ano)->whereMonth('data', $mes);
