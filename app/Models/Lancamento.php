@@ -103,6 +103,23 @@ class Lancamento extends Model
         return $this->isPendente() && $this->data?->isPast();
     }
 
+    /**
+     * Chave "YYYY-MM" da fatura em que este lançamento entra.
+     * Usa fatura_key quando definida; caso contrário calcula pelo ciclo do cartão.
+     */
+    public function faturaChave(): string
+    {
+        if ($this->fatura_key) {
+            return $this->fatura_key;
+        }
+
+        if ($this->cartao && $this->data) {
+            return $this->cartao->faturaChave($this->data);
+        }
+
+        return $this->data ? $this->data->format('Y-m') : now()->format('Y-m');
+    }
+
     public function getFormaLabelAttribute(): string
     {
         return match ($this->forma_pagamento) {

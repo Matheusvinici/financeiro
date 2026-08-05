@@ -65,9 +65,11 @@ class Assinatura extends Model
                 continue;
             }
 
+            $dataCobranca = $mes->copy()->day(min($dia, $mes->daysInMonth));
+
             Lancamento::create([
                 'user_id' => $this->user_id,
-                'data' => $mes->copy()->day(min($dia, $mes->daysInMonth)),
+                'data' => $dataCobranca,
                 'descricao' => $this->nome,
                 'valor' => $this->valor,
                 'tipo' => 'despesa',
@@ -78,10 +80,17 @@ class Assinatura extends Model
                 'qtd_parcelas' => 1,
                 'parcela_atual' => 1,
                 'assinatura_id' => $this->id,
+                'fatura_key' => $this->cartao ? $this->cartao->faturaChave($dataCobranca) : $chave,
                 'pago' => $chave < $chaveAtual,
                 'abate_saldo' => true,
                 'observacao' => 'Assinatura gerada automaticamente',
             ]);
+        }
+
+        if ($this->cartao) {
+            $this->lancamentos()->whereNull('fatura_key')->get()->each(function (Lancamento $l) {
+                $l->update(['fatura_key' => $this->cartao->faturaChave($l->data)]);
+            });
         }
     }
 

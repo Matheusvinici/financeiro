@@ -66,6 +66,26 @@ class Cartao extends Model
     }
 
     /**
+     * Próxima fatura ainda não paga, buscando do mês atual para frente.
+     * É a fatura que está em aberto / sendo construída.
+     */
+    public function proximaFaturaAberta(): ?array
+    {
+        $pagas = collect($this->faturas_pagas ?? []);
+        $hoje = now();
+
+        for ($i = 0; $i < 24; $i++) {
+            $mes = $hoje->copy()->addMonths($i)->month;
+            $ano = $hoje->copy()->addMonths($i)->year;
+            if (!$pagas->contains(fn ($f) => (int) $f['mes'] === $mes && (int) $f['ano'] === $ano)) {
+                return ['mes' => $mes, 'ano' => $ano];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Retorna "YYYY-MM" do vencimento da fatura em que esta compra entra,
      * considerando o ciclo fechamento -> vencimento do cartão.
      */

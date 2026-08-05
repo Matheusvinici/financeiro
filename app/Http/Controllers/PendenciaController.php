@@ -45,20 +45,23 @@ class PendenciaController extends Controller
             ->limit(50)
             ->get();
 
-        // Compras do cartão no período selecionado
+        // Compras do cartão (crédito) — janela ampla para agrupar faturas por vencimento
+        $inicioJanela = $hoje->copy()->subMonths(24)->startOfMonth();
+        $fimJanela = $hoje->copy()->addMonths(11)->endOfMonth();
+
         $comprasCartao = $user->lancamentos()
             ->with('cartao')
             ->where('tipo', 'despesa')
             ->where('forma_pagamento', 'cartao')
             ->where('cartao_debito', false)
             ->whereNotNull('cartao_id')
-            ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
+            ->whereBetween('data', [$inicioJanela, $fimJanela])
             ->get()
             ->filter(fn ($l) => $l->cartao !== null);
 
-        // Agrupar faturas do período
-        $faturasCartao = $comprasCartao
-            ->groupBy(fn ($l) => $l->cartao_id . '|' . ($l->fatura_key ?: $l->data->format('Y-m')))
+        // Agrupar faturas pela chave da fatura (fatura_key ou ciclo do cartão)
+        $faturasTodas = $comprasCartao
+            ->groupBy(fn ($l) => $l->cartao_id . '|' . $l->faturaChave())
             ->map(function ($g, $key) {
                 [$cId, $chave] = explode('|', $key);
                 [$fAno, $fMes] = array_map('intval', explode('-', $chave));
@@ -80,71 +83,52 @@ class PendenciaController extends Controller
             })
             ->values();
 
-        // Faturas pendentes do período selecionado
-        $faturaPendentes = $mesAtual === null
-            ? collect()
-            : $faturasCartao->filter(fn ($f) => !$f['pago'])
-                ->map(fn ($f) => (object) [
-                    'is_fatura' => true,
-                    'fatura_cartao' => $f['cartao'],
-                    'fatura_total' => $f['total'],
-                    'fatura_qtd' => $f['qtd'],
-                    'fatura_mes' => $f['fatura_mes'],
-                    'fatura_ano' => $f['fatura_ano'],
-                    'data' => $f['vencimento'],
-                    'atrasada' => false,
-                ]);
+        // Faturas em aberto: vencendo no período OU no mês seguinte (fatura em construção)
+        $fimPeriodo = $mesAtual === null
+            ? Carbon::create($ano, 12, 31)
+            : Carbon::create($ano, $mesAtual, 1)->endOfMonth()->addMonth();
 
-        // Faturas de meses ANTERIORES que continuam pagas (atrasadas)
-        $faturasAtrasadas = collect();
-        if ($mesAtual !== null) {
-            $cartoes = $user->cartoes()->where('ativo', true)->get();
-            $mesesAnteriores = [];
-            $dataRef = Carbon::create($ano, $mesAtual, 1);
-            for ($i = 1; $i <= 12; $i++) {
-                $dataRef->subMonth();
-                $mesesAnteriores[] = ['mes' => $dataRef->month, 'ano' => $dataRef->year];
-            }
+        $faturasCartao = $mesAtual === null
+            ? $faturasTodas->filter(fn ($f) => $f['fatura_ano'] === $ano)
+            : $faturasTodas->filter(
+                fn ($f) => $f['vencimento']->copy()->startOfDay()->lte($fimPeriodo->copy()->endOfDay())
+            )->values();
 
-            foreach ($cartoes as $cartao) {
-                foreach ($mesesAnteriores as $ma) {
-                    if ($cartao->faturaPaga($ma['mes'], $ma['ano'])) {
-                        continue; // já paga, não precisa mostrar
-                    }
+        // Faturas pendentes do período em aberto
+        $faturaPendentes = $faturasCartao->filter(fn ($f) => !$f['pago'])
+            ->map(fn ($f) => (object) [
+                'is_fatura' => true,
+                'fatura_cartao' => $f['cartao'],
+                'fatura_total' => $f['total'],
+                'fatura_qtd' => $f['qtd'],
+                'fatura_mes' => $f['fatura_mes'],
+                'fatura_ano' => $f['fatura_ano'],
+                'data' => $f['vencimento'],
+                'atrasada' => false,
+            ]);
 
-                    $chaveAlvo = sprintf('%04d-%02d', $ma['ano'], $ma['mes']);
+        // Faturas de meses ANTERIORES que continuam sem pagamento (atrasadas)
+        $inicioPeriodo = $mesAtual === null
+            ? Carbon::create($ano, 1, 1)
+            : Carbon::create($ano, $mesAtual, 1)->startOfDay();
 
-                    $compras = $user->lancamentos()
-                        ->where('cartao_id', $cartao->id)
-                        ->where('tipo', 'despesa')
-                        ->where('forma_pagamento', 'cartao')
-                        ->where('cartao_debito', false)
-                        ->get()
-                        ->filter(fn ($l) => ($l->fatura_key ?: $l->data->format('Y-m')) === $chaveAlvo);
-
-                    if ($compras->isEmpty()) {
-                        continue;
-                    }
-
-                    $vencimento = Carbon::create($ma['ano'], $ma['mes'], min(
-                        (int) ($cartao->dia_vencimento ?: 1),
-                        Carbon::create($ma['ano'], $ma['mes'], 1)->daysInMonth
-                    ));
-
-                    $faturasAtrasadas->push((object) [
-                        'is_fatura' => true,
-                        'fatura_cartao' => $cartao,
-                        'fatura_total' => round($compras->sum('valor'), 2),
-                        'fatura_qtd' => $compras->count(),
-                        'fatura_mes' => $ma['mes'],
-                        'fatura_ano' => $ma['ano'],
-                        'data' => $vencimento,
-                        'atrasada' => true,
-                        'dias_atraso' => (int) $vencimento->copy()->startOfDay()->diffInDays($hoje->copy()->startOfDay()),
-                    ]);
-                }
-            }
-        }
+        $faturasAtrasadas = $faturasTodas->filter(function ($f) use ($inicioPeriodo) {
+            return !$f['pago']
+                && $f['vencimento']->copy()->startOfDay()->lt($inicioPeriodo)
+                && $f['vencimento']->copy()->startOfDay()->gte($inicioPeriodo->copy()->subMonths(24));
+        })->map(function ($f) use ($hoje) {
+            return (object) [
+                'is_fatura' => true,
+                'fatura_cartao' => $f['cartao'],
+                'fatura_total' => $f['total'],
+                'fatura_qtd' => $f['qtd'],
+                'fatura_mes' => $f['fatura_mes'],
+                'fatura_ano' => $f['fatura_ano'],
+                'data' => $f['vencimento'],
+                'atrasada' => true,
+                'dias_atraso' => (int) $f['vencimento']->copy()->startOfDay()->diffInDays($hoje->copy()->startOfDay()),
+            ];
+        })->values();
 
         // Despesas individuais de meses ANTERIORES que continuam pendentes (atrasadas)
         $despesasAtrasadas = collect();
@@ -154,7 +138,7 @@ class PendenciaController extends Controller
                 ->where('tipo', 'despesa')
                 ->where('pago', false)
                 ->where(fn ($q) => $q->whereNull('cartao_id')->orWhere('forma_pagamento', '!=', 'cartao')->orWhere('cartao_debito', true))
-                ->where('data', '<', $hoje->copy()->startOfDay())
+                ->where('data', '<', $inicioPeriodo)
                 ->orderBy('data')
                 ->get()
                 ->map(function ($l) use ($hoje) {
@@ -183,9 +167,7 @@ class PendenciaController extends Controller
             ->when($mesAtual, fn ($q) => $q->noMes($ano, $mesAtual), fn ($q) => $q->whereYear('data', $ano))
             ->sum('valor');
 
-        if ($mesAtual !== null) {
-            $totalPago += $faturasCartao->where('pago', true)->sum('total');
-        }
+        $totalPago += $faturasCartao->where('pago', true)->sum('total');
 
         $mesesDisponiveis = $user->lancamentos()
             ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')
