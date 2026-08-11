@@ -229,32 +229,32 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($faturasCartao->sortBy(fn ($f) => $f['vencimento']) as $f)
-                            @php $cartao = $f['cartao']; @endphp
-                            <tr class="{{ $f['pago'] ? 'table-success-subtle' : 'table-light' }}">
+                        @foreach ($faturasCartao->sortBy(fn ($f) => $f->vencimento) as $f)
+                            @php $cartao = $f->cartao; @endphp
+                            <tr class="{{ $f->pago ? 'table-success-subtle' : 'table-light' }}">
                                 <td class="text-nowrap">
-                                    <strong>{{ $f['vencimento']->translatedFormat('d/m') }}</strong>
-                                    <span class="d-block small text-muted">{{ $f['vencimento']->translatedFormat('M/Y') }}</span>
+                                    <strong>{{ $f->vencimento->translatedFormat('d/m') }}</strong>
+                                    <span class="d-block small text-muted">{{ $f->vencimento->translatedFormat('M/Y') }}</span>
                                 </td>
                                 <td>
                                     <strong>{{ $cartao->nome }}</strong>
                                     <span class="badge bg-{{ $cartao->tipo === 'debito' ? 'secondary' : 'info' }}">{{ $cartao->tipo_label }}</span>
-                                    <span class="d-block small text-muted">{{ $f['qtd'] }} compra(s) nesta fatura</span>
+                                    <span class="d-block small text-muted">{{ $f->qtd }} compra(s) nesta fatura</span>
                                 </td>
-                                <td class="text-end fw-bold">R$ {{ number_format($f['total'], 2, ',', '.') }}</td>
+                                <td class="text-end fw-bold">R$ {{ number_format($f->total, 2, ',', '.') }}</td>
                                 <td>
-                                    @if ($f['pago'])
+                                    @if ($f->pago)
                                         <span class="badge bg-success">Fatura paga</span>
                                     @else
                                         <span class="badge bg-warning text-dark">A pagar</span>
                                     @endif
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    @if (!$f['pago'])
+                                    @if (!$f->pago)
                                         <form method="POST" action="{{ route('pendencias.fatura', $cartao) }}" class="d-inline">
                                             @csrf
-                                            <input type="hidden" name="mes" value="{{ $f['fatura_mes'] }}">
-                                            <input type="hidden" name="ano" value="{{ $f['fatura_ano'] }}">
+                                            <input type="hidden" name="mes" value="{{ $f->mes }}">
+                                            <input type="hidden" name="ano" value="{{ $f->ano }}">
                                             <button class="btn btn-sm btn-success" title="Marcar fatura como paga"><i class="fa-solid fa-check me-1"></i>Pagar fatura</button>
                                         </form>
                                     @endif

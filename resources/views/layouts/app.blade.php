@@ -128,6 +128,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif
+            @if (session('error'))
+                <div class="alert alert-danger alert-dismissible fade show d-flex justify-content-between align-items-center" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="alert alert-danger alert-dismissible fade show d-flex justify-content-between align-items-center" role="alert">
                     <div><strong>Ops!</strong> Verifique os erros abaixo.</div>

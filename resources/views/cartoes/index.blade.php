@@ -52,7 +52,7 @@
         <div class="stat-card red">
             <div class="stat-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
             <div class="stat-value">R$ {{ number_format($totalGeral, 2, ',', '.') }}</div>
-            <div class="stat-label">Total gasto no período</div>
+            <div class="stat-label">{{ $mes === 'todos' ? 'Total das faturas atuais' : 'Total das faturas de ' . \Illuminate\Support\Carbon::create($ano, $mes, 1)->translatedFormat('F/Y') }}</div>
         </div>
         <div class="stat-card green">
             <div class="stat-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
@@ -83,17 +83,13 @@
                         </div>
                         <hr class="my-2">
                         <div class="row text-center">
-                            <div class="col-4">
-                                <span class="text-muted small">Gasto no período</span>
-                                <h6 class="text-danger">R$ {{ number_format($t['gasto_periodo'], 2, ',', '.') }}</h6>
+                            <div class="col-6">
+                                <span class="text-muted small">{{ $t['destaque_label'] }}</span>
+                                <h6 class="text-danger">R$ {{ number_format($t['destaque'], 2, ',', '.') }}</h6>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6">
                                 <span class="text-muted small">À vista</span>
                                 <h6>R$ {{ number_format($t['avista_periodo'], 2, ',', '.') }}</h6>
-                            </div>
-                            <div class="col-4">
-                                <span class="text-muted small">Parcelas</span>
-                                <h6 class="text-primary">R$ {{ number_format($t['parcelas_periodo'], 2, ',', '.') }}</h6>
                             </div>
                         </div>
                         @if ($t['cartao']->limite > 0)
@@ -280,53 +276,38 @@
     {{-- Ajustes de fatura --}}
     <div class="card shadow-sm mt-2">
         <div class="card-header">
-            <h5 class="card-title mb-0"><i class="fa-solid fa-sliders me-2 text-warning"></i>Ajustes de fatura <small class="text-muted">(esqueceu de lançar algo ou parcelou a fatura — o valor entra na fatura escolhida e atualiza os gráficos)</small></h5>
+            <h5 class="card-title mb-0"><i class="fa-solid fa-sliders me-2 text-warning"></i>Ajustes de fatura <small class="text-muted">(informe o valor que está na fatura do cartão — o sistema calcula sozinho se precisa adicionar ou reduzir)</small></h5>
         </div>
         <div class="card-body">
-            <form method="POST" action="{{ route('cartoes.ajustes.store') }}" class="row g-2 align-items-end">
-                @csrf
-                <div class="col-md-2">
-                    <label class="form-label small">Cartão *</label>
-                    <select name="cartao_id" class="form-select form-select-sm" required>
-                        @foreach (auth()->user()->cartoes()->where('ativo', true)->orderBy('nome')->get() as $c)
-                            <option value="{{ $c->id }}">{{ $c->nome }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small">Fatura</label>
-                    <div class="d-flex gap-1">
-                        <select name="mes" class="form-select form-select-sm">
-                            @foreach (range(1, 12) as $m)
-                                <option value="{{ $m }}" @selected($m === (int) now()->month)>{{ \Carbon\Carbon::create()->month($m)->translatedFormat('M') }}</option>
-                            @endforeach
-                        </select>
-                        <select name="ano" class="form-select form-select-sm">
-                            @foreach (range(now()->year, now()->year + 1) as $y)
-                                <option value="{{ $y }}" @selected($y === (int) now()->year)>{{ $y }}</option>
+            @forelse ($faturasAjuste as $cartaoNome => $faturas)
+                <form method="POST" action="{{ route('cartoes.ajustes.store') }}" class="form-ajuste-fatura row g-2 align-items-end pb-3 mb-3 border-bottom">
+                    @csrf
+                    <div class="col-md-5">
+                        <label class="form-label small w-100">{{ $cartaoNome }} — Fatura *
+                            <span class="fatura-ajuste-atual badge bg-light text-dark float-end fw-normal"></span>
+                        </label>
+                        <select name="fatura" class="fatura-ajuste-select form-select form-select-sm" required>
+                            @foreach ($faturas as $f)
+                                <option value="{{ $f->cartao_id }}|{{ $f->chave }}" data-total="{{ number_format($f->total, 2, ',', '.') }}">
+                                    {{ \Carbon\Carbon::create($f->ano, $f->mes, 1)->translatedFormat('F') }} / {{ $f->ano }} — R$ {{ number_format($f->total, 2, ',', '.') }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small">Operação</label>
-                    <select name="operacao" class="form-select form-select-sm">
-                        <option value="adicionar">Adicionar à fatura</option>
-                        <option value="reduzir">Reduzir da fatura</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small">Valor (R$) *</label>
-                    <input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm" required>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label small">Motivo</label>
-                    <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Ex.: compra esquecida, parcelamento" maxlength="150">
-                </div>
-                <div class="col-md-1">
-                    <button class="btn btn-sm btn-warning w-100"><i class="fa-solid fa-check me-1"></i>Aplicar</button>
-                </div>
-            </form>
+                    <div class="col-md-3">
+                        <label class="form-label small">Valor da fatura (R$) *</label>
+                        <input type="text" name="valor" class="fatura-ajuste-valor form-control form-control-sm" placeholder="R$ 0,00" inputmode="decimal" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">&nbsp;</label>
+                        <div>
+                            <button class="btn btn-sm btn-warning text-dark fw-bold px-2 py-1"><i class="fa-solid fa-check me-1"></i>Ajustar fatura</button>
+                        </div>
+                    </div>
+                </form>
+            @empty
+                <div class="alert alert-light text-muted mb-0"><i class="fa-solid fa-credit-card me-1"></i>Nenhuma fatura em aberto para ajustar.</div>
+            @endforelse
             @if ($ajustes->isNotEmpty())
                 <hr>
                 <div class="table-responsive">
@@ -345,7 +326,12 @@
                                 <tr>
                                     <td>{{ $ajuste->cartao?->nome }}</td>
                                     <td>{{ \Carbon\Carbon::create()->month((int) substr($ajuste->fatura_key, 5, 2))->translatedFormat('M') . '/' . substr($ajuste->fatura_key, 0, 4) }}</td>
-                                    <td>{{ $ajuste->descricao }}</td>
+                                    <td>
+                                        {{ $ajuste->descricao }}
+                                        @if ($ajuste->observacao)
+                                            <div class="small text-muted">{{ $ajuste->observacao }}</div>
+                                        @endif
+                                    </td>
                                     <td class="text-end {{ $ajuste->valor >= 0 ? 'text-danger' : 'text-success' }}">{{ $ajuste->valor >= 0 ? '+' : '' }}R$ {{ number_format($ajuste->valor, 2, ',', '.') }}</td>
                                     <td class="text-end">
                                         <form method="POST" action="{{ route('cartoes.ajustes.destroy', $ajuste) }}" class="d-inline" onsubmit="return confirm('Remover ajuste?')">
@@ -406,3 +392,36 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.querySelectorAll('.form-ajuste-fatura').forEach(function (form) {
+            const select = form.querySelector('.fatura-ajuste-select');
+            const valor = form.querySelector('.fatura-ajuste-valor');
+            const atual = form.querySelector('.fatura-ajuste-atual');
+            if (!select) return;
+
+            function aplicarMascara(el) {
+                const digits = el.value.replace(/\D/g, '').slice(0, 12);
+                const num = parseInt(digits || '0', 10);
+                el.value = (num / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            }
+
+            function atualizarValor() {
+                const opt = select.selectedOptions[0];
+                if (!opt || !opt.dataset.total) {
+                    valor.value = '';
+                    atual.textContent = '';
+                    return;
+                }
+                valor.value = opt.dataset.total;
+                aplicarMascara(valor);
+                atual.textContent = 'Valor atual da fatura: R$ ' + opt.dataset.total;
+            }
+
+            select.addEventListener('change', atualizarValor);
+            valor.addEventListener('input', function () { aplicarMascara(valor); });
+            atualizarValor();
+        });
+    </script>
+@endpush

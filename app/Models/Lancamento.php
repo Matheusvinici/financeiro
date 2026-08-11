@@ -63,6 +63,20 @@ class Lancamento extends Model
         return $this->qtd_parcelas > 1;
     }
 
+    public function isCreditoCartao(): bool
+    {
+        return $this->tipo === 'despesa'
+            && $this->forma_pagamento === 'cartao'
+            && !$this->cartao_debito
+            && $this->cartao_id !== null;
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(fn ($lancamento) => \App\Services\ConsolidacaoFinanceira::sincronizarLancamento($lancamento));
+        static::deleted(fn ($lancamento) => \App\Services\ConsolidacaoFinanceira::sincronizarLancamento($lancamento));
+    }
+
     public function serieRelacionada(): \Illuminate\Support\Collection
     {
         if ($this->assinatura_id) {

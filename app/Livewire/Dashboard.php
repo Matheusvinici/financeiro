@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Models\Assinatura;
 use App\Models\ContaPagar;
+use App\Models\ResumoMensal;
+use App\Services\ConsolidacaoFinanceira;
 use App\Services\ResumoFinanceiro;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
@@ -50,6 +52,7 @@ class Dashboard extends Component
         $user = auth()->user();
         $hoje = Carbon::now();
 
+        ConsolidacaoFinanceira::sincronizarUsuario($user);
         Assinatura::sincronizar($user);
 
         $mes = $this->mes === 'todos' ? 'todos' : (int) ($this->mes ?: $hoje->month);
@@ -58,9 +61,16 @@ class Dashboard extends Component
         $periodo = $mes === 'todos' ? 'ano' : 'mes';
         $mesAtual = $mes === 'todos' ? null : $mes;
 
-        $receitasMes = (float) $user->lancamentos()->where('tipo', 'receita')
-            ->quando($periodo, $ano, $mesAtual)->sum('valor');
-        $despesasMes = ResumoFinanceiro::despesasPeriodo($user, $periodo, $ano, $mesAtual);
+        $resumos = ResumoMensal::where('user_id', $user->id)
+            ->where('ano', $ano)
+            ->get()
+            ->keyBy('mes');
+        $receitasMes = $mesAtual !== null
+            ? (float) ($resumos[$mesAtual]->receitas_total ?? 0)
+            : (float) $resumos->sum('receitas_total');
+        $despesasMes = $mesAtual !== null
+            ? (float) ($resumos[$mesAtual]->despesas_total ?? 0)
+            : (float) $resumos->sum('despesas_total');
         $saldoMes = $receitasMes - $despesasMes;
 
         $assinaturasEntram = ResumoFinanceiro::assinaturasEntramCartao($user, $periodo, $ano, $mesAtual);
@@ -74,9 +84,12 @@ class Dashboard extends Component
             $periodoAnt = 'mes';
         }
 
-        $receitasMesAnterior = (float) $user->lancamentos()->where('tipo', 'receita')
-            ->quando($periodoAnt, $periodoAnterior->year, $periodoAnterior->month)->sum('valor');
-        $despesasMesAnterior = ResumoFinanceiro::despesasPeriodo($user, $periodoAnt, $periodoAnterior->year, $periodoAnterior->month);
+        $receitasMesAnterior = (float) (ResumoMensal::where('user_id', $user->id)
+            ->where('ano', $periodoAnterior->year)->where('mes', $periodoAnterior->month)
+            ->value('receitas_total') ?? 0);
+        $despesasMesAnterior = (float) (ResumoMensal::where('user_id', $user->id)
+            ->where('ano', $periodoAnterior->year)->where('mes', $periodoAnterior->month)
+            ->value('despesas_total') ?? 0);
         $saldoMesAnterior = $receitasMesAnterior - $despesasMesAnterior;
 
         $saldoAno = (float) $user->lancamentos()->whereYear('data', $ano)
@@ -91,10 +104,7 @@ class Dashboard extends Component
             ->orderByDesc('data')->orderByDesc('id')
             ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
 
-        $despesasLista = $user->lancamentos()->with('categoria')
-            ->where('tipo', 'despesa')->where('abate_saldo', true)->semAssinaturasFuturas()->quando($periodo, $ano, $mesAtual)
-            ->orderByDesc('data')->orderByDesc('id')
-            ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
+        $despesasLista = $this->despesasDoPeriodo($user, $periodo, $ano, $mesAtual);
 
         $mesesDisponiveis = $user->lancamentos()
             ->selectRaw('YEAR(data) as ano, MONTH(data) as mes')
@@ -193,6 +203,41 @@ class Dashboard extends Component
             'alertas', 'simulador', 'graficos', 'ultimos',
             'assinaturasEntram', 'totAssinaturasEntram'
         ));
+    }
+
+    /**
+     * Itens de despesa do período para a listagem: lançamentos normais (fora
+     * de cartão de crédito) mais uma linha por fatura de cartão. Os totais
+     * são lidos de resumos_mensais; aqui apenas a lista de exibição.
+     */
+    private function despesasDoPeriodo($user, string $periodo, int $ano, ?int $mes): \Illuminate\Support\Collection
+    {
+        $base = $user->lancamentos()->with('categoria')
+            ->where('tipo', 'despesa')->where('abate_saldo', true)->semAssinaturasFuturas()
+            ->where(function ($q) {
+                $q->whereNull('cartao_id')
+                    ->orWhere('cartao_debito', true)
+                    ->orWhere('forma_pagamento', '!=', 'cartao');
+            })
+            ->quando($periodo, $ano, $mes)
+            ->orderByDesc('data')->orderByDesc('id')
+            ->get(['id', 'data', 'descricao', 'valor', 'categoria_id']);
+
+        $faturas = \App\Models\FaturaCartao::where('user_id', $user->id)
+            ->with('cartao')
+            ->when($mes !== null, fn ($q) => $q->where('ano', $ano)->where('mes', $mes), fn ($q) => $q->where('ano', $ano))
+            ->where('total', '!=', 0)
+            ->get()
+            ->map(fn ($f) => (object) [
+                'data' => $f->vencimento ?? Carbon::create($f->ano, $f->mes, 1),
+                'descricao' => 'Fatura ' . $f->cartao->nome . ' ' . $f->vencimento?->translatedFormat('M/Y') ?? $f->chave,
+                'categoria' => null,
+                'valor' => (float) $f->total,
+            ]);
+
+        return $base->concat($faturas)
+            ->sortByDesc(fn ($l) => $l->data->timestamp)
+            ->values();
     }
 
     private function categoriasQueCrescem($user, int $ano, int $mes, int $anoAnt, int $mesAnt): array

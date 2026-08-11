@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assinatura;
 use App\Models\Cartao;
 use App\Models\Lancamento;
+use App\Services\ConsolidacaoFinanceira;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -15,6 +16,7 @@ class CartaoController extends Controller
         $user = auth()->user();
         $hoje = Carbon::now();
 
+        ConsolidacaoFinanceira::sincronizarUsuario($user);
         Assinatura::sincronizar($user);
 
         $mes = $request->input('mes');
@@ -38,16 +40,49 @@ class CartaoController extends Controller
 
             $avistaPeriodo = $gastoPeriodo - $parcelasPeriodo;
 
+            $aberta = $cartao->proximaFaturaAberta();
+            if ($aberta) {
+                $faturaAtualLabel = Carbon::create($aberta['ano'], $aberta['mes'], 1)->translatedFormat('M/Y');
+                $faturaAtualTotal = (float) $cartao->totalFatura($aberta['mes'], $aberta['ano']);
+            } else {
+                $faturaAtualLabel = null;
+                $faturaAtualTotal = 0;
+            }
+
+            $isCredito = in_array($cartao->tipo, ['credito', 'credito_debito'], true);
+            if ($isCredito && $mesAtual !== null) {
+                $faturaMesTotal = (float) $cartao->totalFatura($mesAtual, $ano);
+                $faturaMesLabel = Carbon::create($ano, $mesAtual, 1)->translatedFormat('M/Y');
+                $destaque = $faturaMesTotal;
+                $destaqueLabel = 'Fatura de ' . $faturaMesLabel;
+            } elseif ($isCredito) {
+                $faturaMesTotal = 0;
+                $faturaMesLabel = null;
+                $destaque = $faturaAtualTotal;
+                $destaqueLabel = $faturaAtualLabel !== null ? 'Fatura atual (' . $faturaAtualLabel . ')' : null;
+            } else {
+                $faturaMesTotal = 0;
+                $faturaMesLabel = null;
+                $destaque = $gastoPeriodo;
+                $destaqueLabel = 'Gasto no período';
+            }
+
             return [
                 'cartao' => $cartao,
                 'gasto_periodo' => $gastoPeriodo,
                 'parcelas_periodo' => $parcelasPeriodo,
                 'avista_periodo' => $avistaPeriodo,
                 'utilizacao_pct' => $cartao->limite > 0 ? round(($gastoPeriodo / $cartao->limite) * 100, 1) : 0,
+                'fatura_atual_label' => $faturaAtualLabel,
+                'fatura_atual_total' => $faturaAtualTotal,
+                'fatura_mes_label' => $faturaMesLabel,
+                'fatura_mes_total' => $faturaMesTotal,
+                'destaque' => $destaque,
+                'destaque_label' => $destaqueLabel,
             ];
         });
 
-        $totalGeral = $totais->sum('gasto_periodo');
+        $totalGeral = $totais->sum('destaque');
 
         $assinaturas = $user->assinaturas()->with(['cartao', 'categoria'])
             ->orderByDesc('ativo')->orderBy('nome')->get();
@@ -57,6 +92,56 @@ class CartaoController extends Controller
             ->with('cartao')
             ->where('ajuste', true)
             ->orderByDesc('data')->limit(15)->get();
+
+        // Faturas para ajuste: somente o mês atual e os próximos 12 meses,
+        // pulando as já pagas — meses passados não são mais ajustáveis.
+        $faturasTotais = Cartao::faturasUsuario(
+            $user,
+            $hoje->copy()->subMonths(24)->startOfMonth(),
+            $hoje->copy()->addMonths(11)->endOfMonth()
+        )->keyBy(fn ($f) => $f->cartao_id . '|' . $f->chave);
+
+        $faturasAjuste = collect();
+        $user->cartoes()->where('ativo', true)->get()->each(function ($cartao) use (&$faturasAjuste, $faturasTotais, $hoje) {
+            if (!in_array($cartao->tipo, ['credito', 'credito_debito'], true)) {
+                return;
+            }
+
+            $inicio = $hoje->copy()->startOfMonth();
+            $fim = $hoje->copy()->addMonths(11)->startOfMonth();
+
+            for ($d = $inicio->copy(); $d->lte($fim); $d->addMonth()) {
+                $mes = $d->month;
+                $ano = $d->year;
+
+                if ($cartao->faturaPaga($mes, $ano)) {
+                    continue;
+                }
+
+                $chave = sprintf('%04d-%02d', $ano, $mes);
+                $total = $faturasTotais->get($cartao->id . '|' . $chave);
+
+                $faturasAjuste->push((object) [
+                    'cartao' => $cartao,
+                    'cartao_id' => $cartao->id,
+                    'mes' => $mes,
+                    'ano' => $ano,
+                    'chave' => $chave,
+                    'vencimento' => Carbon::create($ano, $mes, min(
+                        (int) ($cartao->dia_vencimento ?: 1),
+                        Carbon::create($ano, $mes, 1)->daysInMonth
+                    )),
+                    'total' => (float) ($total?->total ?? 0),
+                    'qtd' => (int) ($total?->qtd ?? 0),
+                    'pago' => false,
+                ]);
+            }
+        });
+
+        $faturasAjuste = $faturasAjuste
+            ->sortBy(fn ($f) => $f->vencimento)
+            ->groupBy(fn ($f) => $f->cartao->nome)
+            ->sortKeys();
 
         // Projeção de parcelas por cartão nos próximos 12 meses
         $inicio = $hoje->copy()->startOfMonth();
@@ -102,7 +187,7 @@ class CartaoController extends Controller
 
         return view('cartoes.index', compact(
             'totais', 'totalGeral', 'mes', 'ano', 'mesesProjecao', 'projecao', 'mesesDisponiveis',
-            'assinaturas', 'totalAssinaturas', 'ajustes'
+            'assinaturas', 'totalAssinaturas', 'ajustes', 'faturasAjuste'
         ));
     }
 
@@ -147,24 +232,41 @@ class CartaoController extends Controller
         $user = auth()->user();
 
         $data = $this->validate($request, [
-            'cartao_id' => ['required', 'exists:cartoes,id'],
-            'mes' => ['required', 'integer', 'min:1', 'max:12'],
-            'ano' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'valor' => ['required', 'numeric', 'min:0.01'],
-            'operacao' => ['required', 'in:adicionar,reduzir'],
-            'motivo' => ['nullable', 'string', 'max:150'],
+            'fatura' => ['required', 'regex:/^\d+\|\d{4}-\d{2}$/'],
+            'valor' => ['required'],
         ]);
 
-        $cartao = $user->cartoes()->findOrFail($data['cartao_id']);
+        [$cartaoId, $faturaKey] = explode('|', $data['fatura']);
+        [$ano, $mes] = array_map('intval', explode('-', $faturaKey));
 
-        $faturaKey = sprintf('%04d-%02d', $data['ano'], $data['mes']);
+        $cartao = $user->cartoes()->findOrFail($cartaoId);
+
+        if ($cartao->faturaPaga($mes, $ano)) {
+            return back()->with('error', "A fatura de {$cartao->nome} ({$mes}/{$ano}) já está marcada como paga e não pode ser ajustada.");
+        }
+
+        $novoValor = $this->converterValor($data['valor']);
+
+        if ($novoValor === null || $novoValor < 0) {
+            return back()->with('error', 'Informe um valor de fatura válido.');
+        }
+
+        $totalAtual = $cartao->totalFatura($mes, $ano);
+        $novoValor = round($novoValor, 2);
+        $diferenca = round($novoValor - $totalAtual, 2);
+
+        if (abs($diferenca) < 0.01) {
+            return back()->with('error', 'A fatura de ' . Carbon::create($ano, $mes, 1)->translatedFormat('M/Y')
+                . " já está no valor informado (R$ " . number_format($totalAtual, 2, ',', '.') . ').');
+        }
+
         $diaVenc = (int) $cartao->dia_vencimento ?: 1;
-        $dataVencimento = Carbon::create($data['ano'], $data['mes'], min($diaVenc, Carbon::create($data['ano'], $data['mes'], 1)->daysInMonth));
+        $dataVencimento = Carbon::create($ano, $mes, min($diaVenc, Carbon::create($ano, $mes, 1)->daysInMonth));
 
         $user->lancamentos()->create([
             'data' => $dataVencimento,
-            'descricao' => ($data['motivo'] ?? null) ? "Ajuste de fatura — {$data['motivo']}" : 'Ajuste de fatura',
-            'valor' => $data['operacao'] === 'reduzir' ? -$data['valor'] : $data['valor'],
+            'descricao' => 'Ajuste de fatura',
+            'valor' => $diferenca,
             'tipo' => 'despesa',
             'forma_pagamento' => 'cartao',
             'cartao_id' => $cartao->id,
@@ -175,10 +277,34 @@ class CartaoController extends Controller
             'abate_saldo' => true,
             'ajuste' => true,
             'fatura_key' => $faturaKey,
-            'observacao' => $data['motivo'] ?? null,
+            'observacao' => 'Fatura ajustada de R$ ' . number_format($totalAtual, 2, ',', '.')
+                . ' para R$ ' . number_format($novoValor, 2, ',', '.'),
         ]);
 
-        return back()->with('success', 'Ajuste registrado na fatura de ' . $dataVencimento->translatedFormat('M/Y') . '.');
+        return back()->with('success', 'Ajuste registrado na fatura de ' . $dataVencimento->translatedFormat('M/Y')
+            . ' para R$ ' . number_format($novoValor, 2, ',', '.') . '.');
+    }
+
+    private function converterValor($valor): ?float
+    {
+        if ($valor === null || trim((string) $valor) === '') {
+            return null;
+        }
+
+        $s = (string) $valor;
+        $s = preg_replace('/[^\d.,\-]/', '', $s);
+        if ($s === '' || $s === '-') {
+            return null;
+        }
+
+        $negativo = str_starts_with($s, '-');
+        $s = ltrim($s, '-');
+        if (str_contains($s, ',')) {
+            $s = str_replace('.', '', $s);
+            $s = str_replace(',', '.', $s);
+        }
+
+        return round((float) $s, 2) * ($negativo ? -1 : 1);
     }
 
     public function destroyAjuste(Lancamento $lancamento)
