@@ -61,11 +61,7 @@
                 <a href="#" class="stat-link" data-bs-toggle="modal" data-bs-target="#modalDespesas" title="Ver quais despesas compõem este total">R$ {{ number_format($despesasMes, 2, ',', '.') }}</a>
             </div>
             <div class="stat-label">Despesas de {{ $rotuloPeriodo }}</div>
-            @if ($totAssinaturasEntram > 0)
-                <div class="stat-sub">R$ {{ number_format($totAssinaturasEntram, 2, ',', '.') }} em assinaturas ainda não entraram no cartão</div>
-            @else
-                <div class="stat-sub"><a href="{{ route('lancamentos.index', ['tipo' => 'despesa']) }}">Ver lançamentos <i class="fa-solid fa-arrow-right ms-1"></i></a></div>
-            @endif
+            <div class="stat-sub"><a href="{{ route('lancamentos.index', ['tipo' => 'despesa']) }}">Ver lançamentos <i class="fa-solid fa-arrow-right ms-1"></i></a></div>
         </div>
 
         <div class="stat-card {{ $saldoMes >= 0 ? 'blue' : 'purple' }}">
@@ -302,19 +298,6 @@
                             @empty
                                 <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma despesa neste período.</td></tr>
                             @endforelse
-                            @if ($assinaturasEntram->isNotEmpty())
-                                <tr class="table-warning">
-                                    <td colspan="4" class="fw-bold small">Assinaturas que ainda não entraram no cartão (cobrança futura):</td>
-                                </tr>
-                                @foreach ($assinaturasEntram as $l)
-                                    <tr class="table-warning">
-                                        <td class="text-nowrap">{{ $l->data->translatedFormat('d/m/Y') }}</td>
-                                        <td>{{ $l->descricao }}</td>
-                                        <td>{{ $l->categoria?->nome ?? '—' }}</td>
-                                        <td class="text-end text-danger">- R$ {{ number_format($l->valor, 2, ',', '.') }}</td>
-                                    </tr>
-                                @endforeach
-                            @endif
                         </tbody>
                         <tfoot>
                             <tr class="table-active">

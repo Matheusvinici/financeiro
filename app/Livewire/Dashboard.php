@@ -73,9 +73,6 @@ class Dashboard extends Component
             : (float) $resumos->sum('despesas_total');
         $saldoMes = $receitasMes - $despesasMes;
 
-        $assinaturasEntram = ResumoFinanceiro::assinaturasEntramCartao($user, $periodo, $ano, $mesAtual);
-        $totAssinaturasEntram = (float) $assinaturasEntram->sum('valor');
-
         if ($mes === 'todos') {
             $periodoAnterior = Carbon::create($ano - 1, 1, 1);
             $periodoAnt = 'ano';
@@ -201,14 +198,14 @@ class Dashboard extends Component
             'saldoAno', 'totalContasAberto', 'contasAberto',
             'receitasLista', 'despesasLista',
             'alertas', 'simulador', 'graficos', 'ultimos',
-            'assinaturasEntram', 'totAssinaturasEntram'
         ));
     }
 
     /**
      * Itens de despesa do período para a listagem: lançamentos normais (fora
-     * de cartão de crédito) mais uma linha por fatura de cartão. Os totais
-     * são lidos de resumos_mensais; aqui apenas a lista de exibição.
+     * de cartão de crédito), uma linha por fatura de cartão (sem o valor das
+     * assinaturas, que são listadas no mês da cobrança) e uma linha por
+     * assinatura. Os totais são lidos de resumos_mensais; aqui apenas a lista.
      */
     private function despesasDoPeriodo($user, string $periodo, int $ano, ?int $mes): \Illuminate\Support\Collection
     {
@@ -226,16 +223,28 @@ class Dashboard extends Component
         $faturas = \App\Models\FaturaCartao::where('user_id', $user->id)
             ->with('cartao')
             ->when($mes !== null, fn ($q) => $q->where('ano', $ano)->where('mes', $mes), fn ($q) => $q->where('ano', $ano))
-            ->where('total', '!=', 0)
             ->get()
-            ->map(fn ($f) => (object) [
-                'data' => $f->vencimento ?? Carbon::create($f->ano, $f->mes, 1),
-                'descricao' => 'Fatura ' . $f->cartao->nome . ' ' . $f->vencimento?->translatedFormat('M/Y') ?? $f->chave,
-                'categoria' => null,
-                'valor' => (float) $f->total,
+            ->map(function ($f) use ($user) {
+                $valor = (float) $f->total - ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave);
+
+                return (object) [
+                    'data' => $f->vencimento ?? Carbon::create($f->ano, $f->mes, 1),
+                    'descricao' => 'Fatura ' . $f->cartao->nome . ' ' . $f->vencimento?->translatedFormat('M/Y') ?? $f->chave,
+                    'categoria' => null,
+                    'valor' => $valor,
+                ];
+            })
+            ->filter(fn ($l) => abs((float) $l->valor) >= 0.01);
+
+        $assinaturas = ResumoFinanceiro::assinaturasDoPeriodo($user, $periodo, $ano, $mes)
+            ->map(fn ($l) => (object) [
+                'data' => $l->data,
+                'descricao' => $l->descricao,
+                'categoria' => $l->categoria,
+                'valor' => (float) $l->valor,
             ]);
 
-        return $base->concat($faturas)
+        return $base->concat($faturas)->concat($assinaturas)
             ->sortByDesc(fn ($l) => $l->data->timestamp)
             ->values();
     }

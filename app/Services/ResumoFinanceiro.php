@@ -10,46 +10,36 @@ use Illuminate\Support\Collection;
  * Regra única de "despesas do período" usada por dashboard, pendências,
  * cartões e relatório mensal, para que todos os totais batam.
  *
- * Total do mês = despesas com data no período (inclusive compras no cartão),
- * que abatem do saldo, excluindo assinaturas cujo dia de cobrança ainda não
- * chegou (elas ainda não entraram no cartão e aparecem separadas).
+ * As assinaturas são contabilizadas no mês da cobrança (data do lançamento),
+ * mesmo antes do dia da cobrança chegar — elas só saem quando a assinatura
+ * é desativada. Nas faturas do cartão elas entram normalmente no ciclo de
+ * fechamento/vencimento (tela de cartões).
  */
 class ResumoFinanceiro
 {
     /**
-     * Total de despesas do período que abatem do saldo, contadas pela data
-     * do lançamento. Assinaturas com cobrança futura ficam de fora.
+     * Lançamentos de assinatura do período, contados pela data de cobrança.
      */
-    public static function despesasPeriodo(User $user, string $periodo, int $ano, ?int $mes = null): float
-    {
-        return (float) $user->lancamentos()
-            ->where('tipo', 'despesa')
-            ->where('abate_saldo', true)
-            ->semAssinaturasFuturas()
-            ->quando($periodo, $ano, $mes)
-            ->sum('valor');
-    }
-
-    /**
-     * Lançamentos de assinatura do período cujo dia de cobrança ainda não
-     * chegou (ainda não entraram no cartão).
-     */
-    public static function assinaturasEntramCartao(User $user, string $periodo, int $ano, ?int $mes = null): Collection
+    public static function assinaturasDoPeriodo(User $user, string $periodo, int $ano, ?int $mes = null): Collection
     {
         return $user->lancamentos()
-            ->with(['cartao', 'categoria'])
-            ->where('tipo', 'despesa')
-            ->soAssinaturasFuturas()
+            ->with(['categoria', 'subcategoria'])
+            ->whereNotNull('assinatura_id')
             ->quando($periodo, $ano, $mes)
             ->orderBy('data')->orderBy('id')
             ->get();
     }
 
     /**
-     * Total das assinaturas do período que ainda não entraram no cartão.
+     * Total de assinaturas que estão dentro da fatura consolidada (chave
+     * "YYYY-MM") de um cartão. Usado para tirar as assinaturas das faturas
+     * quando o total é contado pelo mês de cobrança (evita contar duas vezes).
      */
-    public static function totalAssinaturasEntram(User $user, string $periodo, int $ano, ?int $mes = null): float
+    public static function totalAssinaturasNaFatura(User $user, string $chave): float
     {
-        return (float) self::assinaturasEntramCartao($user, $periodo, $ano, $mes)->sum('valor');
+        return (float) $user->lancamentos()
+            ->whereNotNull('assinatura_id')
+            ->where('fatura_key', $chave)
+            ->sum('valor');
     }
 }
