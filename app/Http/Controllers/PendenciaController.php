@@ -75,6 +75,7 @@ class PendenciaController extends Controller
             ? $faturasTodas->filter(fn ($f) => $f->ano === $ano)
             : $faturasTodas->filter(
                 fn ($f) => $f->vencimento->copy()->startOfDay()->lte($fimPeriodo->copy()->endOfDay())
+                    && ($f->pago === false || $f->vencimento->copy()->startOfDay()->gte($inicioPeriodo->copy()->startOfDay()))
             )->values();
 
         // Faturas pendentes do período em aberto (as de antes do período entram em "atrasadas")
