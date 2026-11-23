@@ -30,7 +30,19 @@ class CartaoController extends Controller
 
         $semAjuste = fn ($q) => $q->where(fn ($w) => $w->where('ajuste', false)->orWhereNull('ajuste'));
 
-        $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo, $semAjuste) {
+        // Planos por fatura: no cartão o plano só soma depois que a data da
+        // cobrança chega; na dashboard somam no mês. Passada a data, entram
+        // aqui sozinhos (sem precisar lançar nada).
+        $planosPorFatura = $user->lancamentos()
+            ->whereNotNull('assinatura_id')
+            ->whereNotNull('cartao_id')
+            ->where('tipo', 'despesa')
+            ->get(['cartao_id', 'fatura_key', 'data', 'valor'])
+            ->groupBy(fn ($l) => $l->cartao_id . '|' . $l->fatura_key)
+            ->map(fn ($g) => round($g->filter(fn ($l) => $l->data->lte($hoje))->sum('valor'), 2));
+        $planoPostado = fn ($cartaoId, $chave) => (float) ($planosPorFatura->get($cartaoId . '|' . $chave) ?? 0);
+
+        $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo, $semAjuste, $planoPostado) {
             // Ajuste de fatura é correção, não gasto: fica só na fatura, fora do "gasto no período".
             $gastoPeriodo = (float) $cartao->lancamentos()
                 ->where('tipo', 'despesa')->where('cartao_debito', false)->semAssinaturasFuturas()->tap($semAjuste)->quando($periodo, $ano, $mesAtual)->sum('valor');
@@ -47,7 +59,8 @@ class CartaoController extends Controller
             $aberta = $cartao->proximaFaturaAberta();
             if ($aberta) {
                 $faturaAtualLabel = Carbon::create($aberta['ano'], $aberta['mes'], 1)->translatedFormat('M/Y');
-                $faturaAtualTotal = (float) $cartao->totalFatura($aberta['mes'], $aberta['ano']);
+                $faturaAtualTotal = (float) $cartao->totalFatura($aberta['mes'], $aberta['ano'])
+                    + $planoPostado($cartao->id, sprintf('%04d-%02d', $aberta['ano'], $aberta['mes']));
             } else {
                 $faturaAtualLabel = null;
                 $faturaAtualTotal = 0;
@@ -55,7 +68,8 @@ class CartaoController extends Controller
 
             $isCredito = in_array($cartao->tipo, ['credito', 'credito_debito'], true);
             if ($isCredito && $mesAtual !== null) {
-                $faturaMesTotal = (float) $cartao->totalFatura($mesAtual, $ano);
+                $faturaMesTotal = (float) $cartao->totalFatura($mesAtual, $ano)
+                    + $planoPostado($cartao->id, sprintf('%04d-%02d', $ano, $mesAtual));
                 $faturaMesLabel = Carbon::create($ano, $mesAtual, 1)->translatedFormat('M/Y');
                 $destaque = $faturaMesTotal;
                 $destaqueLabel = 'Fatura de ' . $faturaMesLabel;
@@ -106,7 +120,7 @@ class CartaoController extends Controller
         )->keyBy(fn ($f) => $f->cartao_id . '|' . $f->chave);
 
         $faturasAjuste = collect();
-        $user->cartoes()->where('ativo', true)->get()->each(function ($cartao) use (&$faturasAjuste, $faturasTotais, $hoje) {
+        $user->cartoes()->where('ativo', true)->get()->each(function ($cartao) use (&$faturasAjuste, $faturasTotais, $hoje, $planoPostado) {
             if (!in_array($cartao->tipo, ['credito', 'credito_debito'], true)) {
                 return;
             }
@@ -137,7 +151,8 @@ class CartaoController extends Controller
                         (int) ($cartao->dia_vencimento ?: 1),
                         Carbon::create($ano, $mes, 1)->daysInMonth
                     )),
-                    'total' => (float) ($total?->total ?? 0),
+                    // Valor exibido = compras + planos já cobrados (data chegada).
+                    'total' => (float) ($total?->total ?? 0) + $planoPostado($cartao->id, $chave),
                     'qtd' => (int) ($total?->qtd ?? 0),
                     'pago' => false,
                 ]);
@@ -158,6 +173,9 @@ class CartaoController extends Controller
             ->whereNotNull('cartao_id')
             ->where('cartao_debito', false)
             ->where(fn ($q) => $q->where('ajuste', false)->orWhereNull('ajuste'))
+            // Plano futuro (data ainda não chegada) não soma na projeção do
+            // cartão; passada a data, entra sozinho.
+            ->where(fn ($q) => $q->whereNull('assinatura_id')->orWhere('data', '<=', $hoje))
             ->whereBetween('data', [$inicio, $fim])
             ->selectRaw("cartao_id, COALESCE(fatura_key, DATE_FORMAT(data, '%Y-%m')) as chave, SUM(valor) as total")
             ->groupBy('cartao_id', 'chave')->get();
@@ -299,13 +317,15 @@ class CartaoController extends Controller
             ->where(fn ($q) => $q->where('ajuste', false)->orWhereNull('ajuste'))
             ->get()->filter(fn ($l) => $l->faturaChave() === $faturaKey)->sum('valor'), 2);
 
-        // O valor digitado é a fatura cheia do banco (com os planos); os
-        // planos somam sozinhos na dashboard, então o ajuste guarda só a
-        // diferença das compras.
+        // O valor digitado é a fatura cheia do banco (com os planos já
+        // cobrados); os planos somam sozinhos na dashboard, então o ajuste
+        // guarda só a diferença das compras. Plano com data futura ainda não
+        // foi cobrado: não entra na conta.
         $planosNaFatura = round((float) $user->lancamentos()
             ->where('cartao_id', $cartao->id)
             ->whereNotNull('assinatura_id')
             ->where('fatura_key', $faturaKey)
+            ->where('data', '<=', Carbon::now())
             ->sum('valor'), 2);
 
         $totalAtual = $comprasTotal;

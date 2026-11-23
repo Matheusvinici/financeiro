@@ -122,6 +122,7 @@
                                                 <span class="text-muted">{{ $item->data->translatedFormat('d/m') }}</span>
                                                 {{ $item->assinatura?->nome ?? $item->descricao }}
                                                 @if ($item->assinatura_id)<span class="badge bg-warning text-dark ms-1">plano</span>@endif
+                                                @if ($item->data->gt(now()->startOfDay()))<span class="badge bg-secondary ms-1" title="Ainda não cobrado: entra na fatura quando a data chegar">previsto</span>@endif
                                                 @if ($item->isParcela())<span class="badge bg-secondary ms-1">{{ $item->parcela_atual }}/{{ $item->qtd_parcelas }}</span>@endif
                                                 @if ($item->ajuste)<span class="badge bg-info text-dark ms-1">ajuste</span>@endif
                                                 <div class="text-muted">{{ $item->categoria?->nome ?? '' }}</div>
