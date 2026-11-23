@@ -2,7 +2,7 @@
     @php
         $rotuloPeriodo = $mes === 'todos' || $mes === 'Todos'
             ? 'ano ' . $ano
-            : \Carbon\Carbon::now()->month((int) $mes)->translatedFormat('F/Y');
+            : \Carbon\Carbon::create((int) $ano, (int) $mes, 1)->translatedFormat('F/Y');
     @endphp
 
     {{-- Seletor de período (atualiza sozinho) --}}
