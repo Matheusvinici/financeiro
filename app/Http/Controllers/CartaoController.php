@@ -111,11 +111,10 @@ class CartaoController extends Controller
                 return;
             }
 
-            // Só faz sentido ajustar fatura próxima (a fechada, a aberta e as
-            // 2 seguintes): liberar 12 meses à frente zerava fatura futura
-            // por engano.
-            $inicio = $hoje->copy()->subMonth()->startOfMonth();
-            $fim = $hoje->copy()->addMonths(2)->startOfMonth();
+            // Janela de 12 meses à frente para ajustar faturas futuras; o
+            // formulário pede confirmação extra além de +2 meses.
+            $inicio = $hoje->copy()->startOfMonth();
+            $fim = $hoje->copy()->addMonths(11)->startOfMonth();
 
             for ($d = $inicio->copy(); $d->lte($fim); $d->addMonth()) {
                 $mes = $d->month;

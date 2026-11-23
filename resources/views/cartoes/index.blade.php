@@ -303,7 +303,7 @@
         </div>
         <div class="card-body">
             @forelse ($faturasAjuste as $cartaoNome => $faturas)
-                <form method="POST" action="{{ route('cartoes.ajustes.store') }}" class="form-ajuste-fatura row g-2 align-items-end pb-3 mb-3 border-bottom">
+                <form method="POST" action="{{ route('cartoes.ajustes.store') }}" class="form-ajuste-fatura row g-2 align-items-end pb-3 mb-3 border-bottom" data-limite="{{ now()->addMonths(2)->format('Y-m') }}">
                     @csrf
                     <div class="col-md-5">
                         <label class="form-label small w-100">{{ $cartaoNome }} — Fatura *
@@ -445,6 +445,18 @@
             select.addEventListener('change', atualizarValor);
             valor.addEventListener('input', function () { aplicarMascara(valor); });
             atualizarValor();
+
+            form.addEventListener('submit', function (e) {
+                const chave = select.value.split('|')[1] || '';
+                const limite = form.dataset.limite || '';
+                if (chave && limite && chave > limite) {
+                    const opt = select.selectedOptions[0];
+                    const nome = opt ? opt.textContent.trim() : chave;
+                    if (!confirm('Atenção: "' + nome + '" é uma fatura futura (além de ' + limite + '). Confirma registrar este valor?')) {
+                        e.preventDefault();
+                    }
+                }
+            });
         });
     </script>
 @endpush
