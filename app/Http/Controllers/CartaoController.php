@@ -28,14 +28,18 @@ class CartaoController extends Controller
 
         $cartoes = $user->cartoes()->withCount('lancamentos')->orderBy('nome')->get();
 
-        $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo) {
+        $semAjuste = fn ($q) => $q->where(fn ($w) => $w->where('ajuste', false)->orWhereNull('ajuste'));
+
+        $totais = $cartoes->map(function ($cartao) use ($ano, $mesAtual, $periodo, $semAjuste) {
+            // Ajuste de fatura é correção, não gasto: fica só na fatura, fora do "gasto no período".
             $gastoPeriodo = (float) $cartao->lancamentos()
-                ->where('tipo', 'despesa')->where('cartao_debito', false)->semAssinaturasFuturas()->quando($periodo, $ano, $mesAtual)->sum('valor');
+                ->where('tipo', 'despesa')->where('cartao_debito', false)->semAssinaturasFuturas()->tap($semAjuste)->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $parcelasPeriodo = (float) $cartao->lancamentos()
                 ->where('tipo', 'despesa')->where('qtd_parcelas', '>', 1)
                 ->where('cartao_debito', false)
                 ->semAssinaturasFuturas()
+                ->tap($semAjuste)
                 ->quando($periodo, $ano, $mesAtual)->sum('valor');
 
             $avistaPeriodo = $gastoPeriodo - $parcelasPeriodo;
@@ -151,6 +155,7 @@ class CartaoController extends Controller
             ->where('tipo', 'despesa')
             ->whereNotNull('cartao_id')
             ->where('cartao_debito', false)
+            ->where(fn ($q) => $q->where('ajuste', false)->orWhereNull('ajuste'))
             ->whereBetween('data', [$inicio, $fim])
             ->selectRaw("cartao_id, COALESCE(fatura_key, DATE_FORMAT(data, '%Y-%m')) as chave, SUM(valor) as total")
             ->groupBy('cartao_id', 'chave')->get();
@@ -251,13 +256,28 @@ class CartaoController extends Controller
             return back()->with('error', 'Informe um valor de fatura válido.');
         }
 
-        $totalAtual = $cartao->totalFatura($mes, $ano);
+        // Um ajuste por fatura: apaga ajustes anteriores e recalcula sobre as
+        // compras reais, senão vários ajustes se empilham e o total confunde.
+        $user->lancamentos()
+            ->where('cartao_id', $cartao->id)
+            ->where('ajuste', true)
+            ->where('fatura_key', $faturaKey)
+            ->get()->each->delete();
+
+        $comprasTotal = round((float) $user->lancamentos()
+            ->where('cartao_id', $cartao->id)
+            ->where('tipo', 'despesa')
+            ->where('cartao_debito', false)
+            ->where(fn ($q) => $q->where('ajuste', false)->orWhereNull('ajuste'))
+            ->get()->filter(fn ($l) => $l->faturaChave() === $faturaKey)->sum('valor'), 2);
+
+        $totalAtual = $comprasTotal;
         $novoValor = round($novoValor, 2);
         $diferenca = round($novoValor - $totalAtual, 2);
 
         if (abs($diferenca) < 0.01) {
-            return back()->with('error', 'A fatura de ' . Carbon::create($ano, $mes, 1)->translatedFormat('M/Y')
-                . " já está no valor informado (R$ " . number_format($totalAtual, 2, ',', '.') . ').');
+            return back()->with('success', 'Ajustes antigos removidos: a fatura de ' . Carbon::create($ano, $mes, 1)->translatedFormat('M/Y')
+                . " já estava no valor informado (R$ " . number_format($totalAtual, 2, ',', '.') . ').');
         }
 
         $diaVenc = (int) $cartao->dia_vencimento ?: 1;
