@@ -188,7 +188,7 @@ class RelatorioController extends Controller
 
         $planos = $user->lancamentos()->with(['categoria', 'subcategoria'])
             ->whereNotNull('assinatura_id')
-            ->when($mesAtual !== null ? 'mes' : 'ano', $ano, $mesAtual)
+            ->quando($mesAtual !== null ? 'mes' : 'ano', $ano, $mesAtual)
             ->orderBy('data')->orderBy('id')
             ->get()
             ->map(fn ($l) => (object) [
