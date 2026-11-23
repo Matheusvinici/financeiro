@@ -50,8 +50,9 @@ class PendenciaController extends Controller
 
         // Faturas de cartão (crédito) — janela ampla para agrupar faturas por vencimento.
         // Usa a mesma fonte dos ajustes de fatura para os valores baterem.
-        $inicioJanela = $hoje->copy()->subMonths(24)->startOfMonth();
-        $fimJanela = $hoje->copy()->addMonths(11)->endOfMonth();
+        // Janela estendida para alcançar anos seguintes (ex.: 2027).
+        $inicioJanela = $hoje->copy()->subMonths(36)->startOfMonth();
+        $fimJanela = $hoje->copy()->addMonths(36)->endOfMonth();
 
         $faturasTodas = Cartao::faturasUsuario($user, $inicioJanela, $fimJanela);
 

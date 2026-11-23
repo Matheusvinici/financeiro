@@ -18,7 +18,7 @@
                 <div class="col-md-2">
                     <label class="form-label small">Ano</label>
                     <select name="ano" class="form-select">
-                        @foreach (range(now()->year, now()->year - 7) as $y)
+                        @foreach (range(now()->year + 5, now()->year - 7) as $y)
                             <option value="{{ $y }}" @selected(request('ano', now()->year) == $y)>{{ $y }}</option>
                         @endforeach
                     </select>

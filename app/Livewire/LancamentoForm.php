@@ -219,6 +219,11 @@ class LancamentoForm extends Component
         if ($this->repeticao === 'periodo' && $this->data_fim) {
             $qtd = max(1, Carbon::parse($this->data)->startOfMonth()
                 ->diffInMonths(Carbon::parse($this->data_fim)->startOfMonth()) + 1);
+        } elseif ($this->repeticao === 'todo_mes') {
+            // Conta fixa: gera série mensal para frente (36 meses) para que
+            // apareça nos filtros de anos seguintes, pendências, dashboard e
+            // relatório mensal — mesmo padrão das linhas importadas da planilha.
+            $qtd = 36;
         } else {
             $qtd = 1;
         }
@@ -266,6 +271,35 @@ class LancamentoForm extends Component
             session()->flash('success', $total > 1
                 ? "Lançamento atualizado em todos os {$total} meses da conta."
                 : 'Lançamento atualizado.');
+
+            return redirect()->route('lancamentos.index');
+        }
+
+        if ($this->repeticao === 'todo_mes' && !$this->lancamentoId) {
+            $hoje = Carbon::now()->startOfDay();
+            for ($i = 0; $i < $qtd; $i++) {
+                $dataParcela = Carbon::parse($this->data)->addMonths($i);
+                $user->lancamentos()->create([
+                    'data' => $dataParcela->format('Y-m-d'),
+                    'descricao' => $this->descricao,
+                    'valor' => $valor,
+                    'tipo' => $this->tipo,
+                    'categoria_id' => $this->categoria_id ?: null,
+                    'subcategoria_id' => $subcategoriaId ?: null,
+                    'forma_pagamento' => $this->forma_pagamento ?: null,
+                    'cartao_id' => $this->forma_pagamento === 'cartao' ? $this->cartao_id : null,
+                    'recorrente' => true,
+                    'qtd_parcelas' => 1,
+                    'parcela_atual' => 1,
+                    'origem_id' => null,
+                    'observacao' => $this->observacao ?: null,
+                    'pago' => $dataParcela->startOfDay()->lte($hoje) ? $this->pago : false,
+                    'abate_saldo' => $this->abate_saldo,
+                    'cartao_debito' => $this->cartao_debito,
+                ]);
+            }
+
+            session()->flash('success', "Conta fixa criada para {$qtd} meses.");
 
             return redirect()->route('lancamentos.index');
         }

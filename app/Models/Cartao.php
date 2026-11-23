@@ -212,8 +212,8 @@ class Cartao extends Model
     private function calcularTotalFatura(int $mes, int $ano): float
     {
         $chave = sprintf('%04d-%02d', $ano, $mes);
-        $inicio = Carbon::create($ano, $mes, 1)->subMonths(24)->startOfMonth();
-        $fim = Carbon::create($ano, $mes, 1)->addMonths(11)->endOfMonth();
+        $inicio = Carbon::create($ano, $mes, 1)->subMonths(36)->startOfMonth();
+        $fim = Carbon::create($ano, $mes, 1)->addMonths(36)->endOfMonth();
 
         return (float) $this->lancamentos()
             ->where('tipo', 'despesa')

@@ -21,7 +21,7 @@
                 <div class="col-md-2">
                     <label class="form-label small">Ano</label>
                     <select wire:model.live="ano" class="form-select">
-                        @foreach ($mesesDisponiveis->pluck('ano')->unique()->sortDesc() as $y)
+                        @foreach ($mesesDisponiveis->pluck('ano')->merge(range(now()->year + 5, now()->year - 7))->unique()->sortDesc()->values() as $y)
                             <option value="{{ $y }}">{{ $y }}</option>
                         @endforeach
                     </select>

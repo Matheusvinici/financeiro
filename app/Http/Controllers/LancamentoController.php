@@ -11,6 +11,7 @@ class LancamentoController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
+        \App\Services\FixasRecorrentes::sincronizarUsuario($user);
         $query = $user->lancamentos()->with(['categoria', 'subcategoria', 'cartao', 'origem']);
 
         $mes = max(1, min(12, (int) $request->input('mes', now()->month)));
@@ -190,10 +191,17 @@ class LancamentoController extends Controller
         abort_unless($lancamento->user_id === auth()->id(), 403);
         abort_if($lancamento->assinatura_id, 403, 'Use a opção da assinatura.');
 
+        $eraFixa = (bool) $lancamento->recorrente;
+
         $removidos = $lancamento->serieRelacionada()
             ->filter(fn ($l) => $l->data->gt(now()->endOfMonth()))
             ->each->delete()
             ->count();
+
+        if ($eraFixa) {
+            // Desativa a renovação automática: sem isso a fixa se recriaria sozinha.
+            $lancamento->serieRelacionada()->each->update(['recorrente' => false]);
+        }
 
         return back()->with('success', "Pausado: {$removidos} lançamento(s) futuro(s) removido(s). O histórico foi preservado.");
     }
@@ -237,8 +245,12 @@ class LancamentoController extends Controller
     {
         $data = collect($data);
 
+        $base = Carbon::parse($data['data']);
+        // Parcelas seguintes caem nos meses seguintes (antes todas caíam no mesmo mês).
+        $dataParcela = $parcelaAtual > 1 ? $base->copy()->addMonths($parcelaAtual - 1) : $base;
+
         return [
-            'data' => $data['data'],
+            'data' => $dataParcela->format('Y-m-d'),
             'descricao' => $parcelaAtual > 1 ? $data['descricao'] . " ({$parcelaAtual}/{$qtdParcelas})" : $data['descricao'],
             'valor' => $data['valor'],
             'tipo' => $data['tipo'],

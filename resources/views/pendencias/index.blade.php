@@ -19,7 +19,7 @@
                 <div class="col-md-2">
                     <label class="form-label small">Ano</label>
                     <select class="form-select" onchange="this.form.submit()" form="filtro-pendencias" name="ano">
-                        @foreach ($mesesDisponiveis->pluck('ano')->unique()->sortDesc() as $y)
+                        @foreach ($mesesDisponiveis->pluck('ano')->merge(range(now()->year + 5, now()->year - 7))->unique()->sortDesc()->values() as $y)
                             <option value="{{ $y }}" @selected($ano === $y)>{{ $y }}</option>
                         @endforeach
                     </select>

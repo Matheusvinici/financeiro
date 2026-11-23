@@ -22,8 +22,8 @@ class ConsolidacaoFinanceira
 {
     /**
      * Recomputa a consolidação de um usuário. Se mes/ano forem informados,
-     * recomputa somente aquele mês; caso contrário, uma janela do passado
-     * ao futuro (36 meses atrás até 13 meses à frente).
+     * recomputa somente aquele mês; caso contrário, renova as fixas e usa
+     * uma janela do passado ao futuro (36 meses atrás até 36 à frente).
      */
     public static function sincronizarUsuario(User $user, ?int $ano = null, ?int $mes = null): void
     {
@@ -35,8 +35,10 @@ class ConsolidacaoFinanceira
             $inicio = Carbon::create($ano, $mes, 1)->startOfMonth();
             $fim = $inicio->copy()->endOfMonth();
         } else {
+            // Conta fixa não é "por ano": renova sozinha até 36 meses à frente.
+            FixasRecorrentes::sincronizarUsuario($user);
             $inicio = $hoje->copy()->subMonths(36)->startOfMonth();
-            $fim = $hoje->copy()->addMonths(13)->endOfMonth();
+            $fim = $hoje->copy()->addMonths(36)->endOfMonth();
         }
 
         self::sincronizarFaturas($user, $inicio, $fim);

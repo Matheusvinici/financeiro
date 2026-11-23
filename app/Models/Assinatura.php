@@ -40,7 +40,7 @@ class Assinatura extends Model
             ? $this->data_inicio->copy()->startOfMonth()
             : $this->created_at->copy()->startOfMonth();
         $fim = $this->ativo
-            ? $agora->copy()->addMonths(11)->endOfMonth()
+            ? $agora->copy()->addMonths(36)->endOfMonth()
             : $agora->copy()->endOfMonth();
 
         if ($this->ativo) {
