@@ -189,10 +189,16 @@ class ConsolidacaoFinanceira
             ->selectRaw('chave, SUM(total) as total')
             ->groupBy('chave')->get()->keyBy('chave');
 
-        // O que está no cartão entra pelo valor cheio da fatura (planos
-        // incluídos, no mês em que são cobrados na fatura) — sem realocar
-        // assinaturas para o mês da cobrança. Base (fora do cartão, por
-        // data) + faturas (pelo ciclo do cartão).
+        // Dashboard soma fatura + planos do cartão: a fatura traz só compras
+        // (planos ficam fora do total da fatura) e os planos ativos entram
+        // no mês da cobrança. Base (fora do cartão, por data) + faturas
+        // (pelo ciclo do cartão) + planos (mês da cobrança).
+        $planos = $user->lancamentos()
+            ->whereNotNull('assinatura_id')
+            ->whereBetween('data', [$inicio, $fim])
+            ->selectRaw("DATE_FORMAT(data, '%Y-%m') as chave, SUM(valor) as total")
+            ->groupBy('chave')->get()->keyBy('chave');
+
         $resumos = [];
         for ($d = $inicio->copy()->startOfMonth(); $d->lte($fim); $d->addMonth()) {
             $chave = $d->format('Y-m');
@@ -203,7 +209,8 @@ class ConsolidacaoFinanceira
                 'receitas_total' => round((float) ($receitas[$chave]->total ?? 0), 2),
                 'despesas_total' => round(
                     (float) ($base[$chave]->total ?? 0)
-                    + (float) ($faturas[$chave]->total ?? 0),
+                    + (float) ($faturas[$chave]->total ?? 0)
+                    + (float) ($planos[$chave]->total ?? 0),
                     2
                 ),
             ];

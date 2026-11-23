@@ -180,6 +180,10 @@ class Cartao extends Model
     /**
      * Recalcula e atualiza a linha consolidada da fatura (valor exato,
      * independente da janela), preservando o status pago.
+     *
+     * Planos (assinaturas) ficam FORA da fatura: eles são somados à parte
+     * na dashboard/relatório ("fatura + planos do cartão"), então não podem
+     * estar dentro do total da fatura.
      */
     public function recomporFaturaRow(int $mes, int $ano): FaturaCartao
     {
@@ -188,6 +192,7 @@ class Cartao extends Model
         $compras = $this->lancamentos()
             ->where('tipo', 'despesa')
             ->where('cartao_debito', false)
+            ->whereNull('assinatura_id')
             ->get()
             ->filter(fn ($l) => $l->faturaChave() === $chave);
 
@@ -218,6 +223,7 @@ class Cartao extends Model
         return (float) $this->lancamentos()
             ->where('tipo', 'despesa')
             ->where('cartao_debito', false)
+            ->whereNull('assinatura_id')
             ->whereBetween('data', [$inicio, $fim])
             ->get()
             ->filter(fn ($l) => $l->faturaChave() === $chave)

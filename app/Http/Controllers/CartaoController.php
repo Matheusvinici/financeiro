@@ -293,12 +293,24 @@ class CartaoController extends Controller
             ->where('cartao_id', $cartao->id)
             ->where('tipo', 'despesa')
             ->where('cartao_debito', false)
+            ->whereNull('assinatura_id')
             ->where(fn ($q) => $q->where('ajuste', false)->orWhereNull('ajuste'))
             ->get()->filter(fn ($l) => $l->faturaChave() === $faturaKey)->sum('valor'), 2);
 
+        // O valor digitado é a fatura cheia do banco (com os planos); os
+        // planos somam sozinhos na dashboard, então o ajuste guarda só a
+        // diferença das compras.
+        $planosNaFatura = round((float) $user->lancamentos()
+            ->where('cartao_id', $cartao->id)
+            ->whereNotNull('assinatura_id')
+            ->where('fatura_key', $faturaKey)
+            ->sum('valor'), 2);
+
         $totalAtual = $comprasTotal;
         $novoValor = round($novoValor, 2);
-        $diferenca = round($novoValor - $totalAtual, 2);
+        // Desconta os planos que já estão na fatura: o digitado é a fatura
+        // cheia do banco, e os planos somam sozinhos na dashboard.
+        $diferenca = round($novoValor - $totalAtual - $planosNaFatura, 2);
 
         if (abs($diferenca) < 0.01) {
             return back()->with('success', 'Ajustes antigos removidos: a fatura de ' . Carbon::create($ano, $mes, 1)->translatedFormat('M/Y')

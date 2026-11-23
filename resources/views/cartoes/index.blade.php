@@ -299,7 +299,7 @@
     {{-- Ajustes de fatura --}}
     <div class="card shadow-sm mt-2">
         <div class="card-header">
-            <h5 class="card-title mb-0"><i class="fa-solid fa-sliders me-2 text-warning"></i>Ajustes de fatura <small class="text-muted">(informe o valor que está na fatura do cartão — o sistema calcula sozinho se precisa adicionar ou reduzir)</small></h5>
+            <h5 class="card-title mb-0"><i class="fa-solid fa-sliders me-2 text-warning"></i>Ajustes de fatura <small class="text-muted">(informe o valor cheio da fatura do banco — os planos do cartão somam sozinhos na dashboard)</small></h5>
         </div>
         <div class="card-body">
             @forelse ($faturasAjuste as $cartaoNome => $faturas)

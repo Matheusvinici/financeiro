@@ -127,8 +127,8 @@ class RelatorioController extends Controller
 
     /**
      * Despesas que abatem do saldo: lançamentos normais (fora de cartão de
-     * crédito) somados por data e uma linha por fatura de cartão pelo valor
-     * cheio — o que está no cartão aparece igual na dashboard e no relatório.
+     * crédito) somados por data, uma linha por fatura de cartão e uma linha
+     * por plano ativo do cartão no mês — dashboard soma fatura + planos.
      */
     private function despesasDoPeriodo($user, ?int $mesAtual, int $ano): array
     {
@@ -186,7 +186,20 @@ class RelatorioController extends Controller
                 });
         }
 
-        return [$base->concat($faturas), $base, $faturas];
+        $planos = $user->lancamentos()->with(['categoria', 'subcategoria'])
+            ->whereNotNull('assinatura_id')
+            ->when($mesAtual !== null ? 'mes' : 'ano', $ano, $mesAtual)
+            ->orderBy('data')->orderBy('id')
+            ->get()
+            ->map(fn ($l) => (object) [
+                'data' => $l->data,
+                'descricao' => $l->descricao,
+                'valor' => (float) $l->valor,
+                'categoria' => $l->categoria,
+                'subcategoria' => $l->subcategoria,
+            ]);
+
+        return [$base->concat($faturas)->concat($planos), $base, $faturas];
     }
 
     private function agruparPorCategoria($receitas, $despesas): array

@@ -202,9 +202,9 @@ class Dashboard extends Component
 
     /**
      * Itens de despesa do período para a listagem: lançamentos normais (fora
-     * de cartão de crédito) e uma linha por fatura de cartão pelo valor
-     * cheio — o que está no cartão aparece igual na dashboard, sem subtrair
-     * os planos. Os totais são lidos de resumos_mensais; aqui apenas a lista.
+     * de cartão de crédito), uma linha por fatura de cartão e uma linha por
+     * plano ativo do cartão — a dashboard soma fatura + planos. Os totais são
+     * lidos de resumos_mensais; aqui apenas a lista.
      */
     private function despesasDoPeriodo($user, string $periodo, int $ano, ?int $mes): \Illuminate\Support\Collection
     {
@@ -233,7 +233,20 @@ class Dashboard extends Component
             })
             ->filter(fn ($l) => abs((float) $l->valor) >= 0.01);
 
-        return $base->concat($faturas)
+        // Planos ativos do cartão somam na dashboard junto com a fatura.
+        $planos = $user->lancamentos()->with(['categoria', 'cartao'])
+            ->whereNotNull('assinatura_id')
+            ->quando($periodo, $ano, $mes)
+            ->orderBy('data')->orderBy('id')
+            ->get()
+            ->map(fn ($l) => (object) [
+                'data' => $l->data,
+                'descricao' => $l->descricao . ($l->cartao ? ' (' . $l->cartao->nome . ')' : ''),
+                'categoria' => $l->categoria,
+                'valor' => (float) $l->valor,
+            ]);
+
+        return $base->concat($faturas)->concat($planos)
             ->sortByDesc(fn ($l) => $l->data->timestamp)
             ->values();
     }
