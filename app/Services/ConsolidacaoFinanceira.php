@@ -189,24 +189,10 @@ class ConsolidacaoFinanceira
             ->selectRaw('chave, SUM(total) as total')
             ->groupBy('chave')->get()->keyBy('chave');
 
-        // Assinaturas são contadas pelo mês de cobrança (data do lançamento),
-        // mesmo antes do dia chegar — e retiradas das faturas onde já estavam
-        // consolidadas, para não serem contadas duas vezes. Usa a mesma
-        // faturaChave() que recomporFaturaRow usa, então o desconto sempre
-        // bate com o que está dentro da fatura (ajustes não são afetados).
-        $assinaturas = $user->lancamentos()->with('cartao')
-            ->whereNotNull('assinatura_id')
-            ->get(['id', 'data', 'valor', 'fatura_key', 'cartao_id']);
-
-        $assinaturasPorCobranca = $assinaturas
-            ->groupBy(fn ($l) => $l->data->format('Y-m'))
-            ->map(fn ($g) => round($g->sum('valor'), 2));
-
-        $assinaturasPorFatura = $assinaturas
-            ->filter(fn ($l) => $l->cartao_id)
-            ->groupBy(fn ($l) => $l->faturaChave())
-            ->map(fn ($g) => round($g->sum('valor'), 2));
-
+        // O que está no cartão entra pelo valor cheio da fatura (planos
+        // incluídos, no mês em que são cobrados na fatura) — sem realocar
+        // assinaturas para o mês da cobrança. Base (fora do cartão, por
+        // data) + faturas (pelo ciclo do cartão).
         $resumos = [];
         for ($d = $inicio->copy()->startOfMonth(); $d->lte($fim); $d->addMonth()) {
             $chave = $d->format('Y-m');
@@ -217,9 +203,7 @@ class ConsolidacaoFinanceira
                 'receitas_total' => round((float) ($receitas[$chave]->total ?? 0), 2),
                 'despesas_total' => round(
                     (float) ($base[$chave]->total ?? 0)
-                    + (float) ($faturas[$chave]->total ?? 0)
-                    + (float) ($assinaturasPorCobranca[$chave] ?? 0)
-                    - (float) ($assinaturasPorFatura[$chave] ?? 0),
+                    + (float) ($faturas[$chave]->total ?? 0),
                     2
                 ),
             ];

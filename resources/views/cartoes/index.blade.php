@@ -109,6 +109,29 @@
                                 Fechamento: {{ $t['cartao']->dia_fechamento ?: '—' }} / Vencimento: {{ $t['cartao']->dia_vencimento ?: '—' }}
                             </div>
                         @endif
+                        @php $det = ($detalhesFatura ?? [])[$t['cartao']->id] ?? null; @endphp
+                        @if ($det && $det['itens']->isNotEmpty())
+                            <button class="btn btn-sm btn-outline-secondary w-100 mt-2" data-bs-toggle="collapse" data-bs-target="#fat{{ $t['cartao']->id }}">
+                                <i class="fa-solid fa-receipt me-1"></i>O que tem na fatura de {{ $det['rotulo'] }} ({{ $det['itens']->count() }})
+                            </button>
+                            <div class="collapse mt-2" id="fat{{ $t['cartao']->id }}">
+                                <ul class="list-group list-group-flush small">
+                                    @foreach ($det['itens'] as $item)
+                                        <li class="list-group-item d-flex justify-content-between align-items-start px-1">
+                                            <div>
+                                                <span class="text-muted">{{ $item->data->translatedFormat('d/m') }}</span>
+                                                {{ $item->assinatura?->nome ?? $item->descricao }}
+                                                @if ($item->assinatura_id)<span class="badge bg-warning text-dark ms-1">plano</span>@endif
+                                                @if ($item->isParcela())<span class="badge bg-secondary ms-1">{{ $item->parcela_atual }}/{{ $item->qtd_parcelas }}</span>@endif
+                                                @if ($item->ajuste)<span class="badge bg-info text-dark ms-1">ajuste</span>@endif
+                                                <div class="text-muted">{{ $item->categoria?->nome ?? '' }}</div>
+                                            </div>
+                                            <strong class="text-danger text-nowrap">R$ {{ number_format($item->valor, 2, ',', '.') }}</strong>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
                     </div>
                     <div class="collapse" id="edit{{ $t['cartao']->id }}">
                         <form method="POST" action="{{ route('cartoes.update', $t['cartao']) }}" class="row g-2 p-3 bg-body-tertiary">

@@ -190,9 +190,34 @@ class CartaoController extends Controller
             ->sortByDesc(fn ($m) => $m['ano'] * 12 + $m['mes'])
             ->values();
 
+        // Itens que compõem a fatura de cada cartão no período: compras +
+        // planos (assinaturas entram na fatura na data de cobrança e, passada
+        // a data, aparecem aqui junto com o resto). Igual ao que a dashboard soma.
+        $detalhesFatura = [];
+        foreach ($cartoes as $cartao) {
+            if ($mesAtual !== null) {
+                $chave = sprintf('%04d-%02d', $ano, $mesAtual);
+                $rotulo = Carbon::create($ano, $mesAtual, 1)->translatedFormat('F/Y');
+            } else {
+                $aberta = $cartao->proximaFaturaAberta();
+                if (!$aberta) {
+                    continue;
+                }
+                $chave = sprintf('%04d-%02d', $aberta['ano'], $aberta['mes']);
+                $rotulo = Carbon::create($aberta['ano'], $aberta['mes'], 1)->translatedFormat('F/Y');
+            }
+            $itens = $cartao->lancamentos()
+                ->with(['categoria', 'assinatura'])
+                ->where('tipo', 'despesa')
+                ->where('cartao_debito', false)
+                ->get()->filter(fn ($l) => $l->faturaChave() === $chave)
+                ->sortBy('data')->values();
+            $detalhesFatura[$cartao->id] = ['chave' => $chave, 'rotulo' => $rotulo, 'itens' => $itens];
+        }
+
         return view('cartoes.index', compact(
             'totais', 'totalGeral', 'mes', 'ano', 'mesesProjecao', 'projecao', 'mesesDisponiveis',
-            'assinaturas', 'totalAssinaturas', 'ajustes', 'faturasAjuste'
+            'assinaturas', 'totalAssinaturas', 'ajustes', 'faturasAjuste', 'detalhesFatura'
         ));
     }
 

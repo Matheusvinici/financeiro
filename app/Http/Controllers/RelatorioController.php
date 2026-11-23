@@ -127,9 +127,8 @@ class RelatorioController extends Controller
 
     /**
      * Despesas que abatem do saldo: lançamentos normais (fora de cartão de
-     * crédito) somados por data, uma linha por fatura de cartão (sem o valor
-     * das assinaturas) e uma linha por assinatura no mês da cobrança — mesma
-     * fonte usada na dashboard e nos totais de resumos_mensais.
+     * crédito) somados por data e uma linha por fatura de cartão pelo valor
+     * cheio — o que está no cartão aparece igual na dashboard e no relatório.
      */
     private function despesasDoPeriodo($user, ?int $mesAtual, int $ano): array
     {
@@ -154,8 +153,7 @@ class RelatorioController extends Controller
 
         if ($mesAtual !== null) {
             foreach ($user->cartoes()->whereIn('tipo', ['credito', 'credito_debito'])->get() as $cartao) {
-                $total = (float) $cartao->totalFatura($mesAtual, $ano)
-                    - \App\Services\ResumoFinanceiro::totalAssinaturasNaFatura($user, sprintf('%04d-%02d', $ano, $mesAtual), $cartao->id);
+                $total = (float) $cartao->totalFatura($mesAtual, $ano);
                 if (abs($total) < 0.01) {
                     continue;
                 }
@@ -173,9 +171,8 @@ class RelatorioController extends Controller
         } else {
             \App\Models\Cartao::faturasUsuario($user, $inicio, $fim)
                 ->filter(fn ($f) => $f->ano === $ano)
-                ->each(function ($f) use (&$faturas, $user) {
-                    $total = (float) $f->total
-                        - \App\Services\ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave, $f->cartao_id);
+                ->each(function ($f) use (&$faturas) {
+                    $total = (float) $f->total;
                     if (abs($total) < 0.01) {
                         return;
                     }
@@ -189,20 +186,7 @@ class RelatorioController extends Controller
                 });
         }
 
-        $assinaturas = \App\Services\ResumoFinanceiro::assinaturasDoPeriodo(
-            $user,
-            $mesAtual !== null ? 'mes' : 'ano',
-            $ano,
-            $mesAtual
-        )->map(fn ($l) => (object) [
-            'data' => $l->data,
-            'descricao' => $l->descricao,
-            'valor' => (float) $l->valor,
-            'categoria' => $l->categoria,
-            'subcategoria' => $l->subcategoria,
-        ]);
-
-        return [$base->concat($faturas)->concat($assinaturas), $base, $faturas];
+        return [$base->concat($faturas), $base, $faturas];
     }
 
     private function agruparPorCategoria($receitas, $despesas): array

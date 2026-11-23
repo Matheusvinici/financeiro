@@ -6,7 +6,6 @@ use App\Models\Assinatura;
 use App\Models\ContaPagar;
 use App\Models\ResumoMensal;
 use App\Services\ConsolidacaoFinanceira;
-use App\Services\ResumoFinanceiro;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -203,9 +202,9 @@ class Dashboard extends Component
 
     /**
      * Itens de despesa do período para a listagem: lançamentos normais (fora
-     * de cartão de crédito), uma linha por fatura de cartão (sem o valor das
-     * assinaturas, que são listadas no mês da cobrança) e uma linha por
-     * assinatura. Os totais são lidos de resumos_mensais; aqui apenas a lista.
+     * de cartão de crédito) e uma linha por fatura de cartão pelo valor
+     * cheio — o que está no cartão aparece igual na dashboard, sem subtrair
+     * os planos. Os totais são lidos de resumos_mensais; aqui apenas a lista.
      */
     private function despesasDoPeriodo($user, string $periodo, int $ano, ?int $mes): \Illuminate\Support\Collection
     {
@@ -224,27 +223,17 @@ class Dashboard extends Component
             ->with('cartao')
             ->when($mes !== null, fn ($q) => $q->where('ano', $ano)->where('mes', $mes), fn ($q) => $q->where('ano', $ano))
             ->get()
-            ->map(function ($f) use ($user) {
-                $valor = (float) $f->total - ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave, $f->cartao_id);
-
+            ->map(function ($f) {
                 return (object) [
                     'data' => $f->vencimento ?? Carbon::create($f->ano, $f->mes, 1),
                     'descricao' => 'Fatura ' . $f->cartao->nome . ' ' . $f->vencimento?->translatedFormat('M/Y') ?? $f->chave,
                     'categoria' => null,
-                    'valor' => $valor,
+                    'valor' => (float) $f->total,
                 ];
             })
             ->filter(fn ($l) => abs((float) $l->valor) >= 0.01);
 
-        $assinaturas = ResumoFinanceiro::assinaturasDoPeriodo($user, $periodo, $ano, $mes)
-            ->map(fn ($l) => (object) [
-                'data' => $l->data,
-                'descricao' => $l->descricao,
-                'categoria' => $l->categoria,
-                'valor' => (float) $l->valor,
-            ]);
-
-        return $base->concat($faturas)->concat($assinaturas)
+        return $base->concat($faturas)
             ->sortByDesc(fn ($l) => $l->data->timestamp)
             ->values();
     }
