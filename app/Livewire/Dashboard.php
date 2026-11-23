@@ -225,7 +225,7 @@ class Dashboard extends Component
             ->when($mes !== null, fn ($q) => $q->where('ano', $ano)->where('mes', $mes), fn ($q) => $q->where('ano', $ano))
             ->get()
             ->map(function ($f) use ($user) {
-                $valor = (float) $f->total - ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave);
+                $valor = (float) $f->total - ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave, $f->cartao_id);
 
                 return (object) [
                     'data' => $f->vencimento ?? Carbon::create($f->ano, $f->mes, 1),

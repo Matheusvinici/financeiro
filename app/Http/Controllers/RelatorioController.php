@@ -155,7 +155,7 @@ class RelatorioController extends Controller
         if ($mesAtual !== null) {
             foreach ($user->cartoes()->whereIn('tipo', ['credito', 'credito_debito'])->get() as $cartao) {
                 $total = (float) $cartao->totalFatura($mesAtual, $ano)
-                    - \App\Services\ResumoFinanceiro::totalAssinaturasNaFatura($user, sprintf('%04d-%02d', $ano, $mesAtual));
+                    - \App\Services\ResumoFinanceiro::totalAssinaturasNaFatura($user, sprintf('%04d-%02d', $ano, $mesAtual), $cartao->id);
                 if (abs($total) < 0.01) {
                     continue;
                 }
@@ -175,7 +175,7 @@ class RelatorioController extends Controller
                 ->filter(fn ($f) => $f->ano === $ano)
                 ->each(function ($f) use (&$faturas, $user) {
                     $total = (float) $f->total
-                        - \App\Services\ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave);
+                        - \App\Services\ResumoFinanceiro::totalAssinaturasNaFatura($user, $f->chave, $f->cartao_id);
                     if (abs($total) < 0.01) {
                         return;
                     }

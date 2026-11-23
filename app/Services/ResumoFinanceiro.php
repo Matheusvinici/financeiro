@@ -34,11 +34,17 @@ class ResumoFinanceiro
      * Total de assinaturas que estão dentro da fatura consolidada (chave
      * "YYYY-MM") de um cartão. Usado para tirar as assinaturas das faturas
      * quando o total é contado pelo mês de cobrança (evita contar duas vezes).
+     *
+     * O filtro por cartão é obrigatório ao abater de UMA fatura: sem ele o
+     * mesmo valor era descontado da fatura de todos os cartões (ex.: uma
+     * assinatura do Nubank gerava "-R$ 562" na fatura do Inter e o modal de
+     * despesas deixava de bater com os cartões e com o resumo).
      */
-    public static function totalAssinaturasNaFatura(User $user, string $chave): float
+    public static function totalAssinaturasNaFatura(User $user, string $chave, ?int $cartaoId = null): float
     {
         return (float) $user->lancamentos()
             ->whereNotNull('assinatura_id')
+            ->when($cartaoId !== null, fn ($q) => $q->where('cartao_id', $cartaoId))
             ->where('fatura_key', $chave)
             ->sum('valor');
     }

@@ -97,8 +97,8 @@ class CartaoController extends Controller
         // pulando as já pagas — meses passados não são mais ajustáveis.
         $faturasTotais = Cartao::faturasUsuario(
             $user,
-            $hoje->copy()->subMonths(24)->startOfMonth(),
-            $hoje->copy()->addMonths(11)->endOfMonth()
+            $hoje->copy()->subMonths(36)->startOfMonth(),
+            $hoje->copy()->addMonths(36)->endOfMonth()
         )->keyBy(fn ($f) => $f->cartao_id . '|' . $f->chave);
 
         $faturasAjuste = collect();
