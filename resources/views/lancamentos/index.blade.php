@@ -62,18 +62,104 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-1">
-                    <label class="form-label small">Busca</label>
-                    <input type="text" name="busca" class="form-control" value="{{ request('busca') }}" placeholder="Buscar...">
+                <div class="col-md-3">
+                    <label class="form-label small">Buscar conta</label>
+                    <input type="search" name="busca" class="form-control form-control-lg" value="{{ request('busca') }}" placeholder="Digite a conta... (ex.: Energia, Pedra Linda)" autocomplete="off">
                 </div>
                 <div class="col-md-1 d-flex gap-1">
                     <button class="btn btn-primary flex-grow-1" title="Filtrar"><i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar</button>
-                    <a href="{{ route('lancamentos.index') }}" class="btn btn-outline-secondary" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
+                    <a href="{{ route('lancamentos.index', ['visao' => $visao ?? 'lista']) }}" class="btn btn-outline-secondary" title="Limpar"><i class="fa-solid fa-rotate-left"></i></a>
                 </div>
             </form>
+            <div class="btn-group mt-3" role="group" aria-label="Modo de visualização">
+                <a href="{{ route('lancamentos.index', array_merge(request()->except('page'), ['visao' => 'lista'])) }}" class="btn btn-sm {{ ($visao ?? 'lista') === 'lista' ? 'btn-primary' : 'btn-outline-primary' }}"><i class="fa-solid fa-list me-1"></i>Lista</a>
+                <a href="{{ route('lancamentos.index', array_merge(request()->except('page'), ['visao' => 'agenda'])) }}" class="btn btn-sm {{ ($visao ?? 'lista') === 'agenda' ? 'btn-primary' : 'btn-outline-primary' }}"><i class="fa-solid fa-calendar-days me-1"></i>Agenda</a>
+            </div>
         </div>
     </div>
 
+    @if (($visao ?? 'lista') === 'agenda')
+        @php
+            $ref = \Carbon\Carbon::create($ano ?? request('ano', now()->year), $mes ?? request('mes', now()->month), 1);
+            $ant = $ref->copy()->subMonth();
+            $prox = $ref->copy()->addMonth();
+            $baseQ = request()->except(['mes', 'ano', 'page']);
+            $inicioBranco = $ref->dayOfWeekIso - 1;
+            $diasMes = $ref->daysInMonth;
+            $nomeMes = $ref->translatedFormat('F/Y');
+        @endphp
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('lancamentos.index', array_merge($baseQ, ['mes' => $ant->month, 'ano' => $ant->year, 'visao' => 'agenda'])) }}" class="btn btn-outline-secondary btn-sm" title="Mês anterior"><i class="fa-solid fa-chevron-left"></i></a>
+                    <h5 class="mb-0 text-capitalize"><i class="fa-solid fa-calendar-days me-2"></i>{{ $nomeMes }}</h5>
+                    <a href="{{ route('lancamentos.index', array_merge($baseQ, ['mes' => $prox->month, 'ano' => $prox->year, 'visao' => 'agenda'])) }}" class="btn btn-outline-secondary btn-sm" title="Próximo mês"><i class="fa-solid fa-chevron-right"></i></a>
+                    <a href="{{ route('lancamentos.index', array_merge($baseQ, ['mes' => now()->month, 'ano' => now()->year, 'visao' => 'agenda'])) }}" class="btn btn-outline-secondary btn-sm">Hoje</a>
+                </div>
+                <div class="d-flex gap-2 small">
+                    <span class="badge bg-success fs-6">+ R$ {{ number_format($totalReceitas ?? 0, 2, ',', '.') }}</span>
+                    <span class="badge bg-danger fs-6">− R$ {{ number_format($totalDespesas ?? 0, 2, ',', '.') }}</span>
+                    <span class="badge {{ (($totalReceitas ?? 0) - ($totalDespesas ?? 0)) >= 0 ? 'bg-primary' : 'bg-warning text-dark' }} fs-6">Saldo R$ {{ number_format(($totalReceitas ?? 0) - ($totalDespesas ?? 0), 2, ',', '.') }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="agenda-grid">
+            @foreach (['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'] as $dow)
+                <div class="agenda-dow">{{ $dow }}</div>
+            @endforeach
+            @for ($b = 0; $b < $inicioBranco; $b++)
+                <div class="agenda-dia vazio"></div>
+            @endfor
+            @for ($dia = 1; $dia <= $diasMes; $dia++)
+                @php
+                    $dataDia = $ref->copy()->day($dia);
+                    $chave = $dataDia->format('Y-m-d');
+                    $itens = ($porDia ?? collect())->get($chave, collect());
+                    $ehHoje = $chave === now()->format('Y-m-d');
+                @endphp
+                <div class="agenda-dia {{ $ehHoje ? 'hoje' : '' }}">
+                    <div class="agenda-num">{{ $dia }}</div>
+                    <div class="agenda-itens">
+                        @foreach ($itens as $l)
+                            @php $assinatura = $l->assinatura_id ? (($assinaturas ?? collect())[$l->assinatura_id] ?? null) : null; @endphp
+                            <div class="agenda-chip {{ $l->tipo === 'receita' ? 'rec' : 'des' }}" title="{{ $l->descricao }} — {{ ($assinatura?->categoria ?? $l->categoria)?->nome ?? 'Sem categoria' }} — R$ {{ number_format($l->valor, 2, ',', '.') }}">
+                                <span class="agenda-desc">{{ $assinatura ? $assinatura->nome : $l->descricao }}</span>
+                                @if ($l->isParcela())<span class="agenda-tag">{{ $l->parcela_atual }}/{{ $l->qtd_parcelas }}</span>@endif
+                                @if ($l->recorrente && !$assinatura)<span class="agenda-tag fixo">fixo</span>@endif
+                                @if ($assinatura)<span class="agenda-tag fixo">mensal</span>@endif
+                                <span class="agenda-valor">{{ $l->tipo === 'receita' ? '+' : '−' }}{{ number_format($l->valor, 0, ',', '.') }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endfor
+        </div>
+        <div class="text-center mt-3">
+            <a href="{{ route('lancamentos.create') }}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i>Novo lançamento</a>
+        </div>
+        @push('scripts')
+        <style>
+            .agenda-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+            .agenda-dow { text-align: center; font-weight: 700; font-size: .75rem; color: #6c757d; padding: 4px; }
+            .agenda-dia { background: var(--bs-body-bg, #fff); border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 10px; min-height: 110px; padding: 4px; display: flex; flex-direction: column; }
+            .agenda-dia.vazio { background: transparent; border: none; }
+            .agenda-dia.hoje { border: 2px solid #0d6efd; }
+            .agenda-num { font-weight: 700; font-size: .85rem; margin-bottom: 2px; }
+            .agenda-dia.hoje .agenda-num { color: #0d6efd; }
+            .agenda-itens { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; max-height: 220px; }
+            .agenda-chip { font-size: .72rem; line-height: 1.25; border-radius: 6px; padding: 2px 5px; background: #f1f3f5; border-left: 3px solid #6c757d; display: flex; flex-wrap: wrap; gap: 2px 4px; align-items: baseline; }
+            .agenda-chip.rec { border-left-color: #198754; background: rgba(25,135,84,.1); }
+            .agenda-chip.des { border-left-color: #dc3545; background: rgba(220,53,69,.08); }
+            .agenda-desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+            .agenda-valor { margin-left: auto; font-weight: 700; }
+            .agenda-chip.rec .agenda-valor { color: #198754; }
+            .agenda-chip.des .agenda-valor { color: #dc3545; }
+            .agenda-tag { font-size: .62rem; background: #6c757d; color: #fff; border-radius: 4px; padding: 0 4px; }
+            .agenda-tag.fixo { background: #0dcaf0; color: #000; }
+            @@media (max-width: 768px) { .agenda-grid { grid-template-columns: repeat(2, 1fr); } .agenda-dia.vazio { display: none; } }
+        </style>
+        @endpush
+    @else
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="fa-solid fa-wallet me-2"></i>Lançamentos</h5>
@@ -186,6 +272,7 @@
             @endif
         </div>
     </div>
+    @endif
 
     <div class="modal fade" id="modalValor" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">

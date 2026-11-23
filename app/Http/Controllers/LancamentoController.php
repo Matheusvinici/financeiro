@@ -35,8 +35,34 @@ class LancamentoController extends Controller
         if ($request->filled('cartao_id')) {
             $query->where('cartao_id', $request->cartao_id);
         }
+        // Ajustes de fatura ficam só na área de Cartões — aqui é a agenda do mês.
+        $query->where(fn ($q) => $q->where('ajuste', false)->orWhereNull('ajuste'));
+
         if ($request->filled('busca')) {
-            $query->where('descricao', 'like', '%' . $request->busca . '%');
+            $termo = '%' . $request->busca . '%';
+            $query->where(fn ($q) => $q->where('descricao', 'like', $termo)->orWhere('observacao', 'like', $termo));
+        }
+
+        $visao = $request->input('visao', 'lista') === 'agenda' ? 'agenda' : 'lista';
+
+        if ($visao === 'agenda') {
+            $todos = (clone $query)->orderBy('data')->orderBy('id')->limit(1000)->get();
+            $assinaturaIds = $todos->whereNotNull('assinatura_id')->pluck('assinatura_id')->unique();
+            $assinaturas = $user->assinaturas()->with(['categoria', 'cartao'])
+                ->whereIn('id', $assinaturaIds)->get()->keyBy('id');
+
+            $porDia = $todos->groupBy(fn ($l) => $l->data->format('Y-m-d'));
+            $totalReceitas = (float) $todos->where('tipo', 'receita')->sum('valor');
+            $totalDespesas = (float) $todos->where('tipo', 'despesa')->sum('valor');
+
+            $categorias = $user->categorias()->orderBy('tipo')->orderBy('nome')->get();
+            $cartoes = $user->cartoes()->orderBy('nome')->get();
+            $lancamentos = collect();
+
+            return view('lancamentos.index', compact(
+                'lancamentos', 'categorias', 'cartoes', 'assinaturas',
+                'visao', 'porDia', 'totalReceitas', 'totalDespesas', 'mes', 'ano'
+            ));
         }
 
         $lancamentos = $query->orderByDesc('data')->orderByDesc('id')->paginate(30)->withQueryString();
@@ -60,7 +86,7 @@ class LancamentoController extends Controller
         $categorias = $user->categorias()->orderBy('tipo')->orderBy('nome')->get();
         $cartoes = $user->cartoes()->orderBy('nome')->get();
 
-        return view('lancamentos.index', compact('lancamentos', 'categorias', 'cartoes', 'assinaturas'));
+        return view('lancamentos.index', compact('lancamentos', 'categorias', 'cartoes', 'assinaturas', 'visao', 'mes', 'ano'));
     }
 
     public function create()
