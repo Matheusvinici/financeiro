@@ -24,18 +24,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label small">Períodos com lançamentos</label>
-                    <select class="form-select" onchange="if(this.value){ window.location.href = this.value; }">
-                        <option value="">— Ir direto para —</option>
-                        @foreach ($mesesDisponiveis as $p)
-                            <option value="{{ route('pendencias.index', ['mes' => $p['mes'], 'ano' => $p['ano']]) }}" @selected($mes === $p['mes'] && $ano === $p['ano'])>
-                                {{ \Carbon\Carbon::create()->month($p['mes'])->translatedFormat('F') . '/' . $p['ano'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3">
+                <div class="col-md-7">
                     <a href="{{ route('pendencias.index', ['mes' => $hoje->month, 'ano' => $hoje->year]) }}" class="btn btn-outline-secondary w-100"><i class="fa-solid fa-calendar-day me-1"></i>Mês atual</a>
                 </div>
             </div>

@@ -26,18 +26,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label small">Períodos com lançamentos</label>
-                    <select class="form-select" onchange="if(this.value){ window.location.href = this.value; }">
-                        <option value="">— Ir direto para —</option>
-                        @foreach ($mesesDisponiveis as $p)
-                            <option value="{{ route('dashboard', ['mes' => $p['mes'], 'ano' => $p['ano']]) }}" @selected((int) $mes === $p['mes'] && (int) $ano === $p['ano'])>
-                                {{ \Carbon\Carbon::now()->month($p['mes'])->translatedFormat('F') . '/' . $p['ano'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3 d-flex gap-1">
+                <div class="col-md-7 d-flex gap-1 align-items-end">
                     <button type="button" wire:click="resetPeriodo" class="btn btn-outline-secondary flex-grow-1" title="Mês atual"><i class="fa-solid fa-rotate-left me-1"></i>Mês atual</button>
                 </div>
             </div>
