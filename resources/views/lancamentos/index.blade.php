@@ -64,7 +64,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small">Buscar conta</label>
-                    <input type="search" name="busca" class="form-control form-control-lg" value="{{ request('busca') }}" placeholder="Digite a conta... (ex.: Energia, Pedra Linda)" autocomplete="off">
+                    <input type="search" name="busca" class="form-control form-control-lg" value="{{ request('busca') }}" placeholder="Digite o nome... (conta, categoria, item ou cartão)" autocomplete="off">
                 </div>
                 <div class="col-md-1 d-flex gap-1">
                     <button class="btn btn-primary flex-grow-1" title="Filtrar"><i class="fa-solid fa-magnifying-glass me-1"></i>Filtrar</button>

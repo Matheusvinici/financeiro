@@ -40,7 +40,12 @@ class LancamentoController extends Controller
 
         if ($request->filled('busca')) {
             $termo = '%' . $request->busca . '%';
-            $query->where(fn ($q) => $q->where('descricao', 'like', $termo)->orWhere('observacao', 'like', $termo));
+            $query->where(fn ($q) => $q
+                ->where('descricao', 'like', $termo)
+                ->orWhere('observacao', 'like', $termo)
+                ->orWhereHas('categoria', fn ($c) => $c->where('nome', 'like', $termo))
+                ->orWhereHas('subcategoria', fn ($c) => $c->where('nome', 'like', $termo))
+                ->orWhereHas('cartao', fn ($c) => $c->where('nome', 'like', $termo)));
         }
 
         $visao = $request->input('visao', 'lista') === 'agenda' ? 'agenda' : 'lista';
